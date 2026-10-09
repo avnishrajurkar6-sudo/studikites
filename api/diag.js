@@ -14,9 +14,21 @@ module.exports = async function handler(req, res) {
       smexgodKey: !!process.env.FIREBASE_SMEXGOD_API_KEY,
       adsense: !!(process.env.ADSENSE_CLIENT || "ca-pub-7694333485336687"),
       rtdb: !!process.env.FIREBASE_STUDIKI_DATABASE_URL,
+      adminEmails: !!process.env.ADMIN_EMAILS,
     },
+    keyCheck: {},
     checks: {},
   };
+  /* Where each key actually comes from + first/last 4 chars, so a typo'd env
+     value is visible at a glance. Codes are public browser keys, not secrets. */
+  function keyInfo(name, fallbackPrefix) {
+    const env = process.env[name] || "";
+    return env
+      ? { source: "env", len: env.length, head: env.slice(0, 6), tail: env.slice(-4), matchesDefault: env.startsWith(fallbackPrefix) }
+      : { source: "code-default", matchesDefault: true };
+  }
+  out.keyCheck.studiki = keyInfo("FIREBASE_STUDIKI_API_KEY", "AIzaSy");
+  out.keyCheck.smexgod = keyInfo("FIREBASE_SMEXGOD_API_KEY", "AIzaSy");
   async function check(name, fn) {
     const t0 = Date.now();
     try {
@@ -28,6 +40,14 @@ module.exports = async function handler(req, res) {
   let routes = null;
   try { routes = mediaRoutes(); } catch (e) { routes = null; }
   await Promise.all([
+    check("studikiKeyLive", async () => {
+      const key = process.env.FIREBASE_STUDIKI_API_KEY || "AIzaSyCG2zFEsE5Fr8Vx-5of_PL0xQeP773MNFM";
+      const r = await fetchUpstream(
+        `https://firestore.googleapis.com/v1/projects/studiki/databases/(default)/documents/users?pageSize=1&key=${encodeURIComponent(key)}`,
+        { timeout: 4000 }
+      );
+      return { status: r.status, keyWorks: r.status === 200 };
+    }),
     check("otp", async () => {
       const r = await fetchUpstream(`${otpBase()}/api/check-user`, {
         method: "POST", headers: { "Content-Type": "application/json" },
