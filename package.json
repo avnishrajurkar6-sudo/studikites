@@ -1,0 +1,9 @@
+{
+  "name": "studikitez-backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "StudiKitEZ API for OTP and course/media calls (Vercel serverless).",
+  "engines": {
+    "node": ">=18"
+  }
+}
