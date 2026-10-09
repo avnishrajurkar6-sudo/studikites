@@ -16,7 +16,11 @@ window.SK.api = (function () {
     try {
       var res = await fetch(url, {
         method: method,
-        headers: Object.assign({ Accept: "application/json", "Content-Type": "application/json" }, opts.headers || {}),
+        headers: Object.assign(
+          { Accept: "application/json" },
+          opts.body ? { "Content-Type": "application/json" } : {},
+          opts.headers || {}
+        ),
         body: opts.body ? JSON.stringify(opts.body) : undefined,
         signal: c.signal,
       });
