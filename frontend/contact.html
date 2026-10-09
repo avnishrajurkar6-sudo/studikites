@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contact — StudiKitEZ</title>
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="posts.html">Posts</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="posts.html">Posts</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:34rem">
+  <div class="page-head anim-rise">
+    <span class="kicker">We read everything</span>
+    <h1>Contact us</h1>
+    <p>Bug reports, payment issues, batch requests — send it here. Replies come to your email.</p>
+  </div>
+
+  <section class="panel anim-rise" style="--d:.05s" aria-label="Contact form">
+    <span class="kicker">New message</span>
+    <div id="form">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <input class="input" id="c-name" placeholder="Your name" maxlength="60" style="flex:1;min-width:10rem;font-size:.9rem" />
+        <input class="input" id="c-email" placeholder="Email or +91 mobile" maxlength="80" style="flex:1;min-width:10rem;font-size:.9rem" />
+      </div>
+      <input class="input" id="c-subject" placeholder="Subject" maxlength="120" style="margin-top:.6rem;font-size:.9rem" />
+      <textarea class="input" id="c-msg" rows="5" placeholder="What happened / what do you need?" maxlength="2000" style="margin-top:.6rem;font-size:.9rem;resize:vertical"></textarea>
+      <button class="btn btn-primary" id="c-send" style="margin-top:.8rem">Send message →</button>
+      <p class="mono muted" style="font-size:.65rem;margin:.7rem 0 0">Goes straight to the admin inbox. Typical reply: within 24h.</p>
+    </div>
+    <div id="done" style="display:none;text-align:center;padding:1.5rem 0">
+      <div class="ava" style="width:3rem;height:3rem;font-size:1.3rem;margin:0 auto .7rem">✓</div>
+      <h3>Message sent</h3>
+      <p class="muted" style="font-size:.9rem">We'll get back to you soon.</p>
+      <a class="btn btn-secondary btn-sm" href="index.html" style="margin-top:.9rem">Back to catalog</a>
+    </div>
+  </section>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.85rem">Telegram</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
+
+  fb.currentUser().then(function (u) {
+    if (!u) return;
+    document.getElementById("c-name").value = u.displayName || "";
+    document.getElementById("c-email").value = u.email || (u.mobile ? "+91 " + u.mobile : "");
+  }).catch(function () {});
+
+  document.getElementById("c-send").addEventListener("click", function () {
+    var name = document.getElementById("c-name").value.trim();
+    var email = document.getElementById("c-email").value.trim();
+    var subject = document.getElementById("c-subject").value.trim();
+    var msg = document.getElementById("c-msg").value.trim();
+    if (!name || !email || !msg) return ui.toast("Missing fields", "Name, contact and message required");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !/[6-9]\d{9}/.test(email.replace(/\D/g, ""))) {
+      return ui.toast("Invalid contact", "Enter a valid email or 10-digit mobile");
+    }
+    var btn = this; btn.disabled = true; btn.textContent = "Sending…";
+    fb.ensure().then(function () {
+      var r = fb.raw();
+      return r.S._fs.addDoc(r.S._fs.collection(r.S.sDb, "contact_messages"), {
+        name: name, email: email, subject: subject || "(no subject)", message: msg, at: Date.now(), status: "open"
+      });
+    }).then(function () {
+      document.getElementById("form").style.display = "none";
+      document.getElementById("done").style.display = "block";
+      ui.toast("Sent ✓", "Admin inbox notified");
+    }).catch(function () {
+      ui.toast("Couldn't send", "Check connection and retry");
+      btn.disabled = false; btn.textContent = "Send message →";
+    });
+  });
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

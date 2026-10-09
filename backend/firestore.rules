@@ -52,6 +52,7 @@ service cloud.firestore {
     }
     match /app/{ver} { allow read, write: if true; }
     match /contact_messages/{id} { allow read, write: if true; }
+    match /feedback/{id} { allow read, write: if true; }
     match /waitlist/{id} { allow read, write: if true; }
   }
 }

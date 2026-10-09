@@ -386,6 +386,81 @@
     try { await fb.sendChat(courseId, contentId, t); document.getElementById("chat-input").value = ""; loadChat(); }
     catch (e) { ui.toast("Couldn't send", ""); }
   });
+
+  /* Feedback popup — fires every 10 minutes of actual watch time. */
+  var watched = 0, lastT = 0, fbShown = 0;
+  video.addEventListener("timeupdate", function () {
+    var t = video.currentTime || 0;
+    if (!video.paused && !video.seeking && lastT && t > lastT && t - lastT < 5) watched += (t - lastT);
+    lastT = t;
+    var mark = Math.floor(watched / 600);
+    if (mark > fbShown && !document.querySelector(".modal")) {
+      fbShown = mark;
+      var key = "sk_fbk_" + contentId + "_" + fb.dayKey();
+      var n = 0;
+      try { n = parseInt(localStorage.getItem(key) || "0", 10) || 0; } catch (e) {}
+      if (n < 3) { try { localStorage.setItem(key, String(n + 1)); } catch (e) {} feedbackPopup(); }
+    }
+  });
+  function feedbackPopup() {
+    var rating = 0;
+    var m = ui.modal(
+      '<span class="kicker">Quick feedback</span>' +
+      '<h3 style="margin:.5rem 0 .35rem">How\'s this lecture?</h3>' +
+      '<p class="muted" style="margin:0 0 .9rem;font-size:.88rem">10 minutes in — your rating shapes what we fix and film next.</p>' +
+      '<div class="stars" id="fb-stars" role="radiogroup" aria-label="Rating out of 5">' +
+        '<button type="button" class="star" data-v="1" aria-label="1 star">★</button>' +
+        '<button type="button" class="star" data-v="2" aria-label="2 stars">★</button>' +
+        '<button type="button" class="star" data-v="3" aria-label="3 stars">★</button>' +
+        '<button type="button" class="star" data-v="4" aria-label="4 stars">★</button>' +
+        '<button type="button" class="star" data-v="5" aria-label="5 stars">★</button>' +
+      "</div>" +
+      '<div class="mono muted" id="fb-hint" style="font-size:.65rem;margin-top:.3rem">tap the stars</div>' +
+      '<textarea class="input" id="fb-improve" rows="2" maxlength="300" placeholder="What to improve?" style="margin-top:.8rem;font-size:.85rem"></textarea>' +
+      '<textarea class="input" id="fb-add" rows="2" maxlength="300" placeholder="What should we add?" style="margin-top:.5rem;font-size:.85rem"></textarea>' +
+      '<div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">' +
+        '<button class="btn btn-primary btn-sm" id="fb-send" disabled>Send feedback</button>' +
+        '<button class="btn btn-ghost btn-sm" id="fb-x">Not now</button>' +
+      "</div>");
+    m.querySelectorAll(".star").forEach(function (s) {
+      s.addEventListener("click", function () {
+        rating = Number(s.dataset.v);
+        m.querySelectorAll(".star").forEach(function (x) { x.classList.toggle("on", Number(x.dataset.v) <= rating); });
+        document.getElementById("fb-hint").textContent = rating + " / 5";
+        document.getElementById("fb-send").disabled = false;
+      });
+      s.addEventListener("mouseenter", function () {
+        m.querySelectorAll(".star").forEach(function (x) { x.classList.toggle("hov", Number(x.dataset.v) <= Number(s.dataset.v) && !x.classList.contains("on")); });
+      });
+      s.addEventListener("mouseleave", function () {
+        m.querySelectorAll(".star").forEach(function (x) { x.classList.remove("hov"); });
+      });
+    });
+    document.getElementById("fb-x").addEventListener("click", function () { ui.closeModal(); });
+    document.getElementById("fb-send").addEventListener("click", function () {
+      if (!rating) return;
+      var improve = document.getElementById("fb-improve").value.trim();
+      var addTxt = document.getElementById("fb-add").value.trim();
+      this.disabled = true; this.textContent = "Sending…";
+      var btn = this;
+      fb.ensure().then(function () {
+        var r = fb.raw();
+        return r.S._fs.addDoc(r.S._fs.collection(r.S.sDb, "feedback"), {
+          uid: user ? user.uid : "guest",
+          courseId: String(courseId), contentId: String(contentId),
+          title: (play && play.title) || "",
+          rating: rating, improve: improve, add: addTxt, at: Date.now()
+        });
+      }).then(function () {
+        ui.closeModal();
+        ui.toast("Thanks! ✓", "Sent — this directly shapes the next batch");
+      }).catch(function () {
+        ui.closeModal();
+        ui.toast("Couldn't send", "Try again or use the contact page");
+      });
+      void btn;
+    });
+  }
 })();
 </script>
 </body>

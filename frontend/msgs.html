@@ -171,7 +171,8 @@
       list.forEach(function (t) {
         if (t.id === "community") return;
         var other = (t.id || "").split("__").filter(function (x) { return x && x !== user.uid; })[0] || "";
-        host.appendChild(threadButton(t.id, other.replace(/^phone_/, "+91 "), t.lastText, t.lastAt));
+        var label = t.lastRole === "admin" ? "Admin" : other.replace(/^phone_/, "+91 ");
+        host.appendChild(threadButton(t.id, label, t.lastText, t.lastAt));
       });
     });
   }
@@ -215,6 +216,19 @@
       el.querySelector("div").textContent = m.fromName || "Admin";
       el.querySelectorAll("div")[1].textContent = m.text || "";
       el.querySelectorAll("div")[2].textContent = timeAgo(m.at) + (m.read ? "" : " · new");
+      if (m.thread || m.from !== user.uid) {
+        var rep = document.createElement("button");
+        rep.className = "btn btn-secondary btn-sm";
+        rep.style.marginTop = ".4rem";
+        rep.textContent = "↩ Reply";
+        rep.addEventListener("click", function () {
+          var tid = m.thread || fb.threadId(user.uid, m.from);
+          openThread(tid, m.fromName || "Admin");
+          var host = document.getElementById("thread-list");
+          if (!host.querySelector('[data-thread="' + tid + '"]')) host.appendChild(threadButton(tid, m.fromName || "Admin", m.text, m.at));
+        });
+        el.appendChild(rep);
+      }
       host.appendChild(el);
       if (!m.read) {
         fb.ensure().then(function () {

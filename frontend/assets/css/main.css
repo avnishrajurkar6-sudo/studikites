@@ -257,6 +257,12 @@ input[type="range"].vol { width: 84px; accent-color: var(--ink); cursor: pointer
 .ann-item { display: flex; gap: 0.8rem; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.9rem 1rem; }
 .ann-item .ico { width: 2rem; height: 2rem; border-radius: 10px; background: var(--ink); color: var(--bg); display: grid; place-items: center; flex: none; font-size: 0.95rem; }
 
+/* Feedback stars */
+.stars { display: flex; gap: 0.4rem; }
+.star { font-size: 1.9rem; line-height: 1; background: none; border: 0; color: var(--line); cursor: pointer; padding: 0; transition: color 0.15s, transform 0.15s; }
+.star:hover, .star.hov { color: var(--muted); transform: scale(1.18); }
+.star.on { color: var(--ink); transform: scale(1.18); animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+
 @media (prefers-reduced-motion: reduce) {
   .modal, .modal-card { animation: none !important; }
 }
