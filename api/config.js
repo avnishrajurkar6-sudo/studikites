@@ -49,6 +49,7 @@ module.exports = async function handler(req, res) {
         messagingSenderId: pick(e.FIREBASE_STUDIKI_SENDER_ID, DEFAULTS.STUDIKI.senderId || DEFAULTS.STUDIKI.messagingSenderId),
         appId: pick(e.FIREBASE_STUDIKI_APP_ID, DEFAULTS.STUDIKI.appId),
         measurementId: pick(e.FIREBASE_STUDIKI_MEASUREMENT_ID, DEFAULTS.STUDIKI.measurementId),
+        databaseURL: pick(e.FIREBASE_STUDIKI_DATABASE_URL, ""),
       },
       SITE_URL: pick(e.SITE_URL, DEFAULTS.SITE_URL),
       TELEGRAM_URL: pick(e.TELEGRAM_URL, DEFAULTS.TELEGRAM_URL),
