@@ -57,6 +57,7 @@
         <div class="timer-digits mono" id="digits" role="timer" aria-live="off">25:00</div>
       </div>
       <div class="mono muted" id="phase" style="font-size:.72rem;letter-spacing:.14em">READY · FOCUS NEXT</div>
+      <div class="mono muted" id="sess-dots" style="font-size:.72rem;margin-top:.35rem;letter-spacing:.2em" aria-label="Sessions completed today"></div>
       <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
         <button class="btn btn-primary" id="t-start">Start</button>
         <button class="btn btn-secondary" id="t-reset">Reset</button>
@@ -110,10 +111,12 @@
   var ui = SK.ui, fb = SK.fb;
   ui.nav(); ui.telegram();
   var user = null;
+  ui.load(true);
   fb.requireLogin("focus.html").then(function (u) {
     user = u; ui.authArea(); stats();
     joinRoom(); listRooms();
-  }).catch(function () {});
+    ui.load(false);
+  }).catch(function () { ui.load(false); });
   var BREAKS = { 25: 5, 50: 10, 90: 15 };
   var focusMin = 25, breakMin = 5, remaining = 25 * 60, running = false, onBreak = false, tick = null, sound = false;
 
@@ -135,6 +138,18 @@
     document.getElementById("phase").textContent = running ? (onBreak ? "BREAK · REST YOUR EYES" : "FOCUS · STAY WITH IT") : "READY · FOCUS NEXT";
     document.title = m + ":" + s + (onBreak ? " · break" : " · focus") + " — StudiKitEZ";
   }
+  function sessKey() { return "sk_focus_done_" + new Date().toISOString().slice(0, 10); }
+  function renderDots() {
+    var host = document.getElementById("sess-dots");
+    if (!host) return;
+    var n = 0;
+    try { n = parseInt(localStorage.getItem(sessKey()) || "0", 10) || 0; } catch (e) {}
+    var dots = "", i;
+    for (i = 0; i < Math.min(n, 8); i++) dots += "●";
+    for (i = dots.length; i < Math.min(Math.max(n, 4), 8); i++) dots += "○";
+    host.textContent = (dots ? dots + "   " : "") + n + " session" + (n === 1 ? "" : "s") + " today";
+  }
+  renderDots();
   function beep() {
     if (!sound) return;
     try {
@@ -169,7 +184,9 @@
           try {
             var k = "sk_activity_" + fb.dayKey();
             localStorage.setItem(k, String(Math.min(999, (parseInt(localStorage.getItem(k) || "0", 10) || 0) + focusMin)));
+            localStorage.setItem(sessKey(), String((parseInt(localStorage.getItem(sessKey()) || "0", 10) || 0) + 1));
           } catch (e) {}
+          renderDots();
           ui.toast("Focus block done ✓", focusMin + " min logged — take " + breakMin + " off");
           stats();
         } else ui.toast("Break over", "Back to focus 🌿");
@@ -218,12 +235,18 @@
       if (!document.body.contains(host)) return;
       if (!m) { spin.remove(); note.style.display = ""; return; }
       if (spin.parentNode) spin.remove();
+      var mine = !!(user && m.uid && m.uid === user.uid);
       var el = document.createElement("div");
       el.className = "anim-rise";
-      el.style.fontSize = ".85rem";
-      el.innerHTML = '<span class="mono muted" style="font-size:.65rem"></span> <span></span>';
-      el.children[0].textContent = m.name || "learner";
-      el.children[1].textContent = m.text || "";
+      if (mine) {
+        el.style.textAlign = "right";
+        el.innerHTML = '<span style="display:inline-block;background:var(--ink);color:var(--bg);border-radius:12px 12px 4px 12px;padding:.4rem .7rem;max-width:88%;font-size:.85rem"></span>';
+        el.querySelector("span").textContent = m.text || "";
+      } else {
+        el.innerHTML = '<div class="mono muted" style="font-size:.62rem;margin-bottom:.15rem"></div><span style="display:inline-block;background:var(--surface-2);border:1px solid var(--line);border-radius:12px 12px 12px 4px;padding:.4rem .7rem;max-width:88%;font-size:.85rem"></span>';
+        el.querySelector("div").textContent = m.name || "learner";
+        el.querySelector("span").textContent = m.text || "";
+      }
       host.appendChild(el);
       while (host.children.length > 60) host.removeChild(host.firstChild);
       host.scrollTop = host.scrollHeight;

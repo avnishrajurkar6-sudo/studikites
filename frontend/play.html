@@ -43,7 +43,7 @@
         </div>
         <button class="iconbtn" id="play-btn" aria-label="Play or pause">▶</button>
         <button class="iconbtn" id="mute-btn" aria-label="Mute or unmute">♪</button>
-        <input type="range" class="vol" id="vol" min="0" max="100" value="100" aria-label="Volume" />
+        <input type="range" class="vol" id="vol" min="0" max="200" value="100" aria-label="Volume, past 100 is boost" title="Volume (past 100 = boost)" />
         <span class="mono muted" style="font-size:.75rem"><span id="t-cur">0:00</span> / <span id="t-dur">0:00</span></span>
         <span style="flex:1"></span>
         <button class="iconbtn" id="pip-btn" aria-label="Picture in picture" title="Picture-in-picture">⧉</button>
@@ -237,21 +237,74 @@
     var sv = parseFloat(localStorage.getItem("sk_vol") || "1");
     if (!isNaN(sv)) video.volume = Math.max(0, Math.min(1, sv));
   } catch (e) {}
-  function paintVol() {
-    var muted = video.muted || video.volume === 0;
-    document.getElementById("mute-btn").textContent = muted ? "✕" : "♪";
-    document.getElementById("vol").value = video.muted ? 0 : Math.round(video.volume * 100);
+  /* Volume boost past 100%: routes audio through a gain node (built only
+     on demand, so normal playback is untouched). Toggle back under 100
+     to restore the native path. */
+  var boostChain = null;
+  function killBoost() {
+    if (!boostChain) return;
+    try { boostChain.src.disconnect(); boostChain.gain.disconnect(); } catch (e) {}
+    try { boostChain.ctx.close(); } catch (e) {}
+    boostChain = null;
+  }
+  function ensureBoost() {
+    if (boostChain) return true;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      var ctx = new AC();
+      if (ctx.state === "suspended") ctx.resume().catch(function () {});
+      var src = ctx.createMediaElementSource(video);
+      var gain = ctx.createGain();
+      gain.gain.value = 1;
+      src.connect(gain); gain.connect(ctx.destination);
+      boostChain = { ctx: ctx, src: src, gain: gain };
+      return true;
+    } catch (e) { return false; }
+  }
+  function paintVol(nativePct) {
+    var slider = document.getElementById("vol");
+    var v = nativePct !== undefined ? nativePct : Number(slider.value);
+    var muted = video.muted || v === 0;
+    document.getElementById("mute-btn").textContent = muted ? "✕" : (v > 100 ? "♪+" : "♪");
+    if (nativePct === undefined) slider.value = v;
   }
   document.getElementById("mute-btn").addEventListener("click", function () {
+    if (boostChain) {
+      var g = boostChain.gain.gain.value > 0;
+      boostChain.remembered = g ? boostChain.gain.gain.value : (boostChain.remembered || 1.5);
+      boostChain.gain.gain.value = g ? 0 : boostChain.remembered;
+      try { localStorage.setItem("sk_vol", String(g ? 0 : boostChain.remembered)); } catch (e) {}
+      paintVol(g ? 0 : Math.round(boostChain.remembered * 100));
+      return;
+    }
     video.muted = !video.muted;
     try { localStorage.setItem("sk_vol", String(video.muted ? 0 : video.volume)); } catch (e) {}
     paintVol();
   });
   document.getElementById("vol").addEventListener("input", function (e) {
-    var v = Number(e.target.value) / 100;
-    video.volume = v; video.muted = v === 0;
-    try { localStorage.setItem("sk_vol", String(v)); } catch (e) {}
-    paintVol();
+    var pct = Math.max(0, Math.min(200, Number(e.target.value) || 0));
+    var v = pct / 100;
+    try { localStorage.setItem("sk_vol", String(v)); } catch (err) {}
+    if (v <= 1) {
+      killBoost();
+      video.volume = v; video.muted = v === 0;
+      paintVol(pct);
+      return;
+    }
+    video.volume = 1; video.muted = false;
+    if (!ensureBoost()) {
+      e.target.value = 100; video.volume = 1;
+      paintVol(100);
+      ui.toast("Boost unavailable", "This browser blocked audio boost");
+      return;
+    }
+    boostChain.gain.gain.value = v;
+    paintVol(pct);
+    if (v > 1 && !boostChain.warned) {
+      boostChain.warned = true;
+      ui.toast("Volume boost on", "Past 100% may distort on some lectures");
+    }
   });
   paintVol();
   document.getElementById("dl-btn").addEventListener("click", function () {

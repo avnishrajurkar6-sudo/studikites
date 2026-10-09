@@ -18,14 +18,46 @@ window.SK.ui = (function () {
   }
   function nav() {
     var btn = document.getElementById("menu-btn"), menu = document.getElementById("mobile-menu");
-    if (!btn || !menu) return;
-    btn.addEventListener("click", function () {
-      var open = menu.classList.toggle("open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    menu.querySelectorAll("a").forEach(function (a) {
-      a.addEventListener("click", function () { menu.classList.remove("open"); });
-    });
+    if (btn && menu) {
+      btn.addEventListener("click", function () {
+        var open = menu.classList.toggle("open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      menu.querySelectorAll("a").forEach(function (a) {
+        a.addEventListener("click", function () { menu.classList.remove("open"); });
+      });
+    }
+    gateNav();
+  }
+  /* Guests never see Dashboard / Focus Rooms links anywhere. */
+  function gateNav() {
+    window.SK.fb.currentUser().then(function (u) {
+      if (u) return;
+      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"]').forEach(function (a) {
+        a.style.display = "none";
+      });
+    }).catch(function () {});
+  }
+  /* Shared page boot: loader on, login check, ban check, ad-free check.
+     strict=false redirects guests to login; strict pages pass allowGuest. */
+  async function gatePage(opts) {
+    opts = opts || {};
+    load(true);
+    var user = null, adFree = false;
+    try { user = await window.SK.fb.currentUser(); } catch (e) { user = null; }
+    if (!user && !opts.allowGuest) {
+      location.href = "login.html?next=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
+      throw new Error("redirect-login");
+    }
+    if (user) {
+      try { await window.SK.fb.banCheck(user.uid); }
+      catch (e) {
+        if (String(e.message).indexOf("BANNED:") === 0) { location.href = "banned.html"; throw e; }
+      }
+      try { adFree = await window.SK.ads.adFree(); } catch (e) { adFree = false; }
+    }
+    load(false);
+    return { user: user, adFree: adFree };
   }
   function telegram() {
     if (document.getElementById("tg-widget")) return;
@@ -98,5 +130,5 @@ window.SK.ui = (function () {
     }
     requestAnimationFrame(step);
   }
-  return { esc: esc, toast: toast, nav: nav, telegram: telegram, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
+  return { esc: esc, toast: toast, nav: nav, gateNav: gateNav, gatePage: gatePage, telegram: telegram, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
 })();

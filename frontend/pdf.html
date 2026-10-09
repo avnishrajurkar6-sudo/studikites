@@ -77,6 +77,7 @@
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
   fb.ensure().then(boot).catch(function () { fail("Sign-in service unreachable. Check connection and retry."); });
+  ui.load(true);
   async function boot() {
     user = await fb.currentUser().catch(function () { return null; });
     if (!user) {
@@ -106,6 +107,7 @@
       if (user) fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: pdfTitle, type: "pdf", done: true }).catch(function () {});
       loadNotes();
       SK.ads.render();
+      ui.load(false);
     } catch (e) { fail("Could not render this document — try Download."); }
   }
   function fail(msg) {
