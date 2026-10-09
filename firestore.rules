@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    /* NOTE: StudiKitEZ supports phone users who have NO Firebase Auth session
+       (verification happens server-side via SESSION_SECRET), so unauthenticated
+       reads/writes are required for the learner flows below. Playback security
+       does not depend on these rules — /api/media/play verifies server-side.
+       Tighten `users` writes to auth.uid == uid || isAdmin once Firebase Auth
+       is mandatory for every user. */
+    function isAdmin() {
+      return exists(/databases/$(db)/documents/users/$(request.auth.uid))
+        && get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update: if true;              // profile, sub, ban flags (see note)
+      allow delete: if false;
+    }
+    match /users/{uid}/inbox/{msg} {
+      allow read, update: if true;
+      allow create: if true;                      // general messages (admin → user, DM copies)
+      allow delete: if false;
+    }
+    match /progress/{uid}/batches/{batch} { allow read, write: if true; }
+    match /studyLog/{id} { allow read, write: if true; }
+    match /notes/{id} { allow read, write: if true; }
+    match /referral_claims/{id} { allow read, write: if true; }
+    match /presence/{uid} { allow read, write: if true; }
+    match /focus_rooms/{room} {
+      allow read, write: if true;
+      match /messages/{msg} { allow read, write: if true; }
+    }
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if true;                       // admin panel only in practice
+    }
+    match /posts/{id} {
+      allow read: if true;
+      allow write: if true;
+      match /likes/{uid} { allow read, write: if true; }
+      match /comments/{cid} { allow read, write: if true; }
+    }
+    match /post_reports/{id} { allow read, write: if true; }
+    match /threads/{id} {
+      allow read, write: if true;
+      match /messages/{msg} { allow read, write: if true; }
+    }
+    match /forceMsgs/{uid} {
+      allow read: if true;
+      allow write: if true;                       // admin sends/heartbeats/releases
+    }
+    match /app/{ver} { allow read, write: if true; }
+    match /contact_messages/{id} { allow read, write: if true; }
+    match /waitlist/{id} { allow read, write: if true; }
+  }
+}
