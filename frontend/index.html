@@ -73,7 +73,7 @@
   var ui = SK.ui, grid = document.getElementById("grid"), q = document.getElementById("q"), all = [];
   ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
   ui.announcePopup();
-  SK.fb.announcements(4).then(function (list) {
+  SK.fb.announcements(8).then(function (list) {
     if (!list.length) return;
     var host = document.getElementById("ann-list");
     document.getElementById("announcements").style.display = "";

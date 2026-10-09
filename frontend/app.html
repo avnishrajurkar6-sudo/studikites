@@ -51,8 +51,8 @@
       </div>
     </section>
 
-    <section class="panel span-8 anim-rise" style="--d:.05s" aria-label="Waitlist">
-      <span class="kicker">Waitlist — notified at launch</span>
+    <section class="panel span-8 anim-rise" style="--d:.05s" id="waitlist-panel" aria-label="Waitlist">
+      <span class="kicker" id="wl-kicker">Waitlist — new APK coming soon</span>
       <div id="waitlist-box">
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
           <input class="input mono" id="wl-contact" placeholder="email or +91 mobile" aria-label="Email or mobile" style="flex:2;min-width:12rem" />
@@ -74,7 +74,7 @@
     </section>
   </div>
 
-  <section class="panel anim-rise" style="margin-top:1.2rem" aria-label="Releases">
+  <section class="panel anim-rise" style="margin-top:1.2rem;display:none" id="releases-panel" aria-label="Releases">
     <span class="kicker">Releases</span>
     <div id="rel-latest" class="muted" style="font-size:.9rem;margin-top:.4rem">Checking latest version…</div>
     <div id="rel-list" style="margin-top:.8rem"></div>
@@ -102,21 +102,31 @@
   var ref = qp("ref");
   if (ref) { try { localStorage.setItem("sk_pending_ref", ref); } catch (e) {} }
 
-  var APP_URL = location.origin + location.pathname.replace(/app\.html$/, "index.html");
+  var APP_URL = "https://studikitesz.pages.dev";
   document.getElementById("qr").src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&color=000000&bgcolor=ffffff&data=" + encodeURIComponent(APP_URL);
   document.getElementById("qr-label").textContent = APP_URL;
   document.getElementById("apk-btn").href = APP_URL;
+  document.getElementById("apk-btn").textContent = "Open web app";
   document.getElementById("copy-link").addEventListener("click", function () {
     if (navigator.clipboard) navigator.clipboard.writeText(APP_URL).then(function () { ui.toast("Copied ✓", "App link ready"); });
     else prompt("Copy app link:", APP_URL);
   });
 
-  document.getElementById("wl-count").textContent = "waitlist open — be early 🌱";
+  document.getElementById("wl-count").textContent = "new APK in progress — join to be first 🌱";
 
-  /* Latest version from Firestore `app` collection (admin publishes versions). */
+  /* Latest version from Firestore `app` collection (admin publishes versions).
+     APK live → waitlist hides. No APK → waitlist is the "coming soon" state. */
   fb.appLatest().then(function (v) {
     var latest = document.getElementById("rel-latest");
-    if (!v || !v.url) { latest.textContent = "No APK published yet — waitlist members get it first."; return; }
+    var waitPanel = document.getElementById("waitlist-panel");
+    var relPanel = document.getElementById("releases-panel");
+    if (!v || !v.url) {
+      waitPanel.style.display = "";
+      relPanel.style.display = "none";
+      return;
+    }
+    waitPanel.style.display = "none";
+    relPanel.style.display = "";
     latest.innerHTML = "";
     var line = document.createElement("div");
     line.style.fontWeight = "700";
@@ -142,6 +152,7 @@
   }).catch(function () {});
   fb.appVersions().then(function (list) {
     if (!list.length) return;
+    document.getElementById("releases-panel").style.display = "";
     var host = document.getElementById("rel-list");
     host.innerHTML = "";
     list.forEach(function (v) {

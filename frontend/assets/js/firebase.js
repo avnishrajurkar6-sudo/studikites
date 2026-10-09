@@ -279,8 +279,10 @@ window.SK.fb = (function () {
   async function sendRoomChat(roomId, text) {
     var me = await currentUser(); if (!me) throw new Error("signin");
     await ensure();
+    var admin = await isAdmin(me.uid);
     await S._fs.addDoc(S._fs.collection(S.sDb, "focus_rooms", roomId, "messages"), {
-      uid: me.uid, name: String(me.displayName || "learner").slice(0, 40),
+      uid: me.uid, name: admin ? "Admin" : String(me.displayName || "learner").slice(0, 40),
+      authorRole: admin ? "admin" : "user",
       text: String(text).slice(0, 300), at: Date.now(),
     });
   }
@@ -350,18 +352,21 @@ window.SK.fb = (function () {
   async function sendMsg(thread, text) {
     var me = await currentUser(); if (!me) throw new Error("signin");
     await ensure();
+    var admin = await isAdmin(me.uid);
+    var dispName = admin ? "Admin" : String(me.displayName || "learner").slice(0, 40);
+    var role = admin ? "admin" : "user";
     var t = String(text).slice(0, 1000), now = Date.now(), mid = now + "_" + Math.random().toString(36).slice(2, 8);
     await S._fs.setDoc(S._fs.doc(S.sDb, "threads", thread, "messages", mid),
-      { from: me.uid, name: String(me.displayName || "learner").slice(0, 40), text: t, at: now });
+      { from: me.uid, name: dispName, authorRole: role, text: t, at: now });
     await S._fs.setDoc(S._fs.doc(S.sDb, "threads", thread),
-      { id: thread, lastText: t.slice(0, 80), lastAt: now, lastBy: me.uid, community: thread === "community" }, { merge: true });
+      { id: thread, lastText: t.slice(0, 80), lastAt: now, lastBy: me.uid, lastRole: role, community: thread === "community" }, { merge: true });
     if (thread !== "community") {
       var other = thread.split("__").filter(function (x) { return x && x !== me.uid; })[0];
       if (other) {
         await S._fs.setDoc(S._fs.doc(S.sDb, "users", other, "inbox", mid),
-          { from: me.uid, fromName: String(me.displayName || "learner").slice(0, 40), text: t.slice(0, 200), at: now, read: false, kind: "general", thread: thread });
+          { from: me.uid, fromName: dispName, authorRole: role, text: t.slice(0, 200), at: now, read: false, kind: "general", thread: thread });
         await S._fs.setDoc(S._fs.doc(S.sDb, "users", me.uid, "inbox", mid),
-          { from: me.uid, fromName: String(me.displayName || "learner").slice(0, 40), text: t.slice(0, 200), at: now, read: true, kind: "sent", thread: thread, to: other });
+          { from: me.uid, fromName: dispName, authorRole: role, text: t.slice(0, 200), at: now, read: true, kind: "sent", thread: thread, to: other });
       }
     }
   }
@@ -489,8 +494,9 @@ window.SK.fb = (function () {
   async function sendChat(courseId, contentId, text) {
     var me = await currentUser(); if (!me) throw new Error("signin");
     await ensure();
+    var admin = await isAdmin(me.uid);
     await S._fs.setDoc(S._fs.doc(S.sDb, "lecture_chats", courseId + "_" + contentId, "messages", Date.now() + "_" + Math.random().toString(36).slice(2, 7)),
-      { uid: me.uid, name: (me.displayName || "learner").slice(0, 40), text: String(text).slice(0, 300), at: Date.now(), deleteAt: Date.now() + 43200000 });
+      { uid: me.uid, name: admin ? "Admin" : String(me.displayName || "learner").slice(0, 40), authorRole: admin ? "admin" : "user", text: String(text).slice(0, 300), at: Date.now(), deleteAt: Date.now() + 43200000 });
   }
   async function listChat(courseId, contentId) {
     try {

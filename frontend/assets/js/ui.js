@@ -78,25 +78,34 @@ window.SK.ui = (function () {
       });
     }).catch(function () {});
   }
-  /* Announcement popup — newest active announcement, once per id. */
+  /* Announcement popup — every unseen announcement, one after another. */
+  var annQueue = [], annBusy = false;
   async function announcePopup() {
     try {
-      var list = await window.SK.fb.announcements(1);
+      var list = await window.SK.fb.announcements(8);
       if (!list.length) return;
-      var a = list[0], key = "sk_ann_" + a.id, seen = null;
-      try { seen = localStorage.getItem(key); } catch (e) {}
-      if (seen) return;
-      var m = modal(
-        '<span class="kicker">Announcement</span><h3 style="margin:.5rem 0 .35rem">' + esc(a.title) + "</h3>" +
-        '<p class="muted" style="margin:0;font-size:.95rem;line-height:1.55"></p>' +
-        '<div style="display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap">' +
-        (a.link ? '<a class="btn btn-primary btn-sm" id="ann-go">Open →</a>' : "") +
-        '<button class="btn btn-ghost btn-sm" id="ann-x">Got it</button></div>');
-      m.querySelector("p").textContent = a.body || "";
-      try { localStorage.setItem(key, "1"); } catch (e) {}
-      if (a.link) m.querySelector("#ann-go").addEventListener("click", function () { location.href = a.link; });
-      m.querySelector("#ann-x").addEventListener("click", closeModal);
+      annQueue = list.filter(function (a) {
+        try { return !localStorage.getItem("sk_ann_" + a.id); } catch (e) { return true; }
+      });
+      if (!annQueue.length) return;
+      if (!annBusy) nextAnn();
     } catch (e) {}
+  }
+  function nextAnn() {
+    if (!annQueue.length) { annBusy = false; return; }
+    annBusy = true;
+    var a = annQueue.shift();
+    try { localStorage.setItem("sk_ann_" + a.id, "1"); } catch (e) {}
+    var m = modal(
+      '<span class="kicker">Announcement' + (annQueue.length ? " · " + (annQueue.length + 1) + " more" : "") + "</span>" +
+      '<h3 style="margin:.5rem 0 .35rem">' + esc(a.title) + "</h3>" +
+      '<p class="muted" style="margin:0;font-size:.95rem;line-height:1.55;white-space:pre-wrap"></p>' +
+      '<div style="display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap">' +
+      (a.link ? '<a class="btn btn-primary btn-sm" id="ann-go">Open →</a>' : "") +
+      '<button class="btn btn-ghost btn-sm" id="ann-x">' + (annQueue.length ? "Next →" : "Got it") + "</button></div>");
+    m.querySelector("p").textContent = a.body || "";
+    if (a.link) m.querySelector("#ann-go").addEventListener("click", function () { closeModal(); nextAnn(); location.href = a.link; });
+    m.querySelector("#ann-x").addEventListener("click", function () { closeModal(); nextAnn(); });
   }
   /* Telegram nag — asks to join on every page view (dismiss lasts this visit). */
   function telegramNag() {

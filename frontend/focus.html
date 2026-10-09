@@ -241,15 +241,18 @@
       if (!m) { spin.remove(); note.style.display = ""; return; }
       if (spin.parentNode) spin.remove();
       var mine = !!(user && m.uid && m.uid === user.uid);
+      var isAdminMsg = m.authorRole === "admin";
       var el = document.createElement("div");
       el.className = "anim-rise";
       if (mine) {
         el.style.textAlign = "right";
         el.innerHTML = '<span style="display:inline-block;background:var(--ink);color:var(--bg);border-radius:12px 12px 4px 12px;padding:.4rem .7rem;max-width:88%;font-size:.85rem"></span>';
         el.querySelector("span").textContent = m.text || "";
+        if (isAdminMsg) el.querySelector("span").style.boxShadow = "0 0 0 1px var(--primary)";
       } else {
         el.innerHTML = '<div class="mono muted" style="font-size:.62rem;margin-bottom:.15rem"></div><span style="display:inline-block;background:var(--surface-2);border:1px solid var(--line);border-radius:12px 12px 12px 4px;padding:.4rem .7rem;max-width:88%;font-size:.85rem"></span>';
-        el.querySelector("div").textContent = m.name || "learner";
+        el.querySelector("div").textContent = isAdminMsg ? "Admin" : (m.name || "learner");
+        if (isAdminMsg) el.querySelector("div").style.color = "var(--primary)";
         el.querySelector("span").textContent = m.text || "";
       }
       host.appendChild(el);

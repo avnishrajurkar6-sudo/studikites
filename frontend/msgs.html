@@ -121,10 +121,12 @@
       if (!m) { spin.remove(); return; }
       if (spin.parentNode) spin.remove();
       var mine = m.from === user.uid;
+      var isAdminMsg = m.authorRole === "admin";
       var row = document.createElement("div");
       row.className = "chat-row" + (mine ? " mine" : "");
       row.innerHTML = '<div class="bubble">' + (mine ? "" : '<span class="who"></span>') + "<span></span></div>";
-      if (!mine) row.querySelector(".who").textContent = m.name || "learner";
+      if (!mine) row.querySelector(".who").textContent = isAdminMsg ? "Admin" : (m.name || "learner");
+      if (isAdminMsg && mine) row.querySelector(".bubble").style.boxShadow = "0 0 0 1px var(--primary)";
       row.querySelectorAll("span")[mine ? 0 : 1].textContent = m.text || "";
       host.appendChild(row);
       while (host.children.length > 120) host.removeChild(host.firstChild);
