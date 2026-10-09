@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>404 — Page not found — StudiKitEZ</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="posts.html">Posts</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span id="auth-area" style="display:flex;gap:.5rem"></span>
+  </div>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:34rem">
+  <div class="empty anim-rise" style="margin-top:12vh">
+    <div class="mono" style="font-size:4rem;font-weight:800;letter-spacing:-.04em;color:var(--ink)">404</div>
+    <h3>Page not found</h3>
+    <p>The page you're looking for doesn't exist or you don't have access to it.</p>
+    <a class="btn btn-primary btn-sm" href="index.html" style="margin-top:1rem">Go home →</a>
+  </div>
+</div></main>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>SK.ui.nav(); SK.ui.telegramNag(); SK.ui.authArea();</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Message from Admin — StudiKitEZ</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  body.forced .site-header, body.forced .site-footer { pointer-events: none; opacity: .35; filter: grayscale(1); }
+  body.forced main { pointer-events: none; opacity: .25; filter: grayscale(1); }
+  #force-card { position: relative; z-index: 70; }
+</style>
+</head>
+<body class="forced">
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary"><span class="mono muted" style="font-size:.7rem;align-self:center">locked</span></nav>
+  </div>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:34rem">
+  <section class="panel anim-rise" id="force-card" style="margin-top:8vh;text-align:center" aria-live="assertive">
+    <span class="kicker" style="border-color:var(--danger);color:var(--danger)">Admin message</span>
+    <div class="ava admin" style="width:3rem;height:3rem;font-size:1.2rem;margin:.8rem auto .6rem">A</div>
+    <div class="mono muted" id="fm-from" style="font-size:.68rem;letter-spacing:.1em">ADMIN · STUDIO KITEZ</div>
+    <p id="fm-text" style="font-size:1.05rem;line-height:1.6;white-space:pre-wrap;margin:.9rem 0;min-height:3rem"></p>
+    <div class="mono muted" id="fm-state" style="font-size:.7rem">Waiting for admin…</div>
+    <div style="margin-top:1.2rem">
+      <button class="btn btn-secondary" id="fm-leave" disabled>Leave page</button>
+    </div>
+    <p class="mono muted" style="font-size:.62rem;margin-top:.9rem">This page stays until the admin lets you go, closes the message, or goes idle for 2 minutes.</p>
+  </section>
+</div></main>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var user = null, released = false, backTo = null;
+  try { backTo = sessionStorage.getItem("sk_force_back") || "dashboard.html"; } catch (e) {}
+
+  ui.load(true);
+  fb.currentUser().then(function (u) {
+    if (!u) { location.href = "login.html?next=forcemsg.html"; throw new Error("login"); }
+    user = u;
+    ui.load(false);
+    fb.watchForce(u.uid, function (f) {
+      if (!f) { release("The admin closed the message."); return; }
+      document.getElementById("fm-text").textContent = f.text || "(empty message)";
+      document.getElementById("fm-from").textContent = (f.fromName || "ADMIN").toUpperCase() + " · STUDIO KITEZ";
+      var active = fb.forceActive(f);
+      if (f.allowLeave === true) { release("The admin allowed you to leave."); return; }
+      if (!active) { release("The admin stepped away — you can leave now."); return; }
+      locked();
+    });
+  }).catch(function (e) {
+    ui.load(false);
+    if (String(e.message) !== "login") document.getElementById("fm-state").textContent = "Connection problem — retrying…";
+  });
+
+  function locked() {
+    released = false;
+    document.body.classList.add("forced");
+    document.getElementById("fm-leave").disabled = true;
+    document.getElementById("fm-state").textContent = "Admin is active — please wait.";
+  }
+  function release(reason) {
+    if (released) return;
+    released = true;
+    document.body.classList.remove("forced");
+    document.getElementById("fm-leave").disabled = false;
+    document.getElementById("fm-state").textContent = reason || "You can leave now.";
+    ui.toast("Released", reason || "You can leave now.");
+  }
+
+  document.getElementById("fm-leave").addEventListener("click", function () {
+    try { sessionStorage.removeItem("sk_force_back"); } catch (e) {}
+    location.href = backTo || "index.html";
+  });
+
+  /* If navigation is attempted while locked, re-bounce (SPA-level guard). */
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a") : null;
+    if (a && released) return;
+    if (a && !released) { e.preventDefault(); ui.toast("Please wait", "The admin must release you first."); }
+  }, true);
+  window.addEventListener("beforeunload", function (e) {
+    if (!released) { e.preventDefault(); e.returnValue = ""; }
+  });
+})();
+</script>
+</body>
+</html>

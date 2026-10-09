@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — StudiKitEZ</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <div class="page-head">
+    <span class="kicker">Restricted</span>
+    <h1>Admin Dashboard</h1>
+    <p>Users, moderation, announcements, messages and releases.</p>
+  </div>
+
+  <div class="bento">
+    <section class="panel span-3 anim-rise"><span class="kicker">Users</span><div class="stat-num"><span id="st-total">—</span></div></section>
+    <section class="panel span-3 anim-rise" style="--d:.04s"><span class="kicker">Online now</span><div class="stat-num"><span id="st-online">—</span></div></section>
+    <section class="panel span-3 anim-rise" style="--d:.08s"><span class="kicker">Banned</span><div class="stat-num"><span id="st-banned">—</span></div></section>
+    <section class="panel span-3 anim-rise" style="--d:.12s"><span class="kicker">Active subs</span><div class="stat-num"><span id="st-subs">—</span></div></section>
+
+    <section class="panel span-6 anim-rise" aria-label="Live now">
+      <div class="row-head" style="justify-content:space-between">
+        <span class="kicker" style="margin:0">🟢 Live now <span id="presence-count" class="muted"></span></span>
+        <button class="btn btn-ghost btn-sm" id="presence-reload">Reload</button>
+      </div>
+      <div id="presence-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem"></div>
+      <div id="presence-empty" class="muted" style="font-size:.8rem;display:none">Nobody online in the last 3 minutes.</div>
+      <p class="mono muted" style="font-size:.62rem;margin:.7rem 0 0">Auto-refreshes every 8 seconds · heartbeat 15s</p>
+    </section>
+
+    <section class="panel span-6 anim-rise" style="--d:.05s" aria-label="All users">
+      <div class="row-head" style="justify-content:space-between">
+        <span class="kicker" style="margin:0">All users <span id="user-count" class="muted"></span></span>
+        <div style="display:flex;gap:.4rem">
+          <input class="input" id="q" placeholder="Search…" style="font-size:.8rem;min-height:38px" />
+          <button class="btn btn-ghost btn-sm" id="reload-btn">Reload</button>
+        </div>
+      </div>
+      <div class="tbl-wrap" style="margin-top:.7rem;max-height:24rem;overflow-y:auto">
+        <table class="tbl">
+          <thead><tr><th>User</th><th>Status</th><th>Subscription</th><th>Actions</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="muted" style="font-size:.8rem;display:none;padding:.8rem 0">No users match.</div>
+      <div style="text-align:center;margin-top:.5rem"><button class="btn btn-ghost btn-sm" id="more-btn" style="display:none">Load more</button></div>
+    </section>
+
+    <section class="panel span-6 anim-rise" aria-label="Send announcement">
+      <span class="kicker">Send announcement</span>
+      <input class="input" id="ann-title" placeholder="Title — e.g. New batch added!" style="margin-bottom:.5rem;font-size:.85rem" />
+      <textarea class="input" id="ann-body" rows="2" placeholder="Message…" style="margin-bottom:.5rem;font-size:.85rem"></textarea>
+      <input class="input" id="ann-link" placeholder="Link (optional) — e.g. content.html?id=105" style="margin-bottom:.6rem;font-size:.85rem" />
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="ann-send">Publish to home</button>
+        <button class="btn btn-ghost btn-sm" id="ann-cancel" style="display:none">Cancel edit</button>
+      </div>
+      <div style="margin-top:1rem">
+        <span class="kicker">Live announcements</span>
+        <div id="ann-list" style="display:flex;flex-direction:column;gap:.5rem"></div>
+      </div>
+    </section>
+
+    <section class="panel span-6 anim-rise" style="--d:.05s" aria-label="Message a user">
+      <span class="kicker">Message a user</span>
+      <input class="input" id="msg-q" placeholder="Search user to message…" style="font-size:.85rem;margin-bottom:.5rem" />
+      <div id="msg-results" style="display:flex;flex-direction:column;gap:.35rem;max-height:9rem;overflow-y:auto"></div>
+      <div id="msg-target" class="mono muted" style="font-size:.7rem;margin-top:.5rem">no one selected</div>
+      <textarea class="input" id="msg-text" rows="2" placeholder="Your message…" style="margin-top:.5rem;font-size:.85rem"></textarea>
+      <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" id="msg-general" disabled>General (notify only)</button>
+        <button class="btn btn-primary btn-sm" id="msg-force" disabled>Force (lock their screen)</button>
+        <button class="btn btn-danger btn-sm" id="force-end" style="display:none">End force</button>
+        <button class="btn btn-ghost btn-sm" id="force-allow" style="display:none">Allow leave</button>
+      </div>
+      <p class="mono muted" style="font-size:.62rem;margin:.7rem 0 0">General → lands in their Messages page as a notification. Force → redirects them to a locked page; releases when you end it, allow leave, or you go idle 2 min.</p>
+    </section>
+
+    <section class="panel span-6 anim-rise" aria-label="Moderation">
+      <div class="row-head" style="justify-content:space-between">
+        <span class="kicker" style="margin:0">🛡 Moderation <span id="mod-count" class="muted"></span></span>
+        <button class="btn btn-ghost btn-sm" id="mod-reload">Reload</button>
+      </div>
+      <div style="margin-top:.7rem">
+        <div class="mono muted" style="font-size:.65rem;letter-spacing:.1em">REPORTS</div>
+        <div id="report-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.4rem"></div>
+      </div>
+      <div style="margin-top:.9rem">
+        <div class="mono muted" style="font-size:.65rem;letter-spacing:.1em">LATEST POSTS</div>
+        <div id="mod-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.4rem"></div>
+      </div>
+    </section>
+
+    <section class="panel span-6 anim-rise" style="--d:.05s" aria-label="Contact inbox">
+      <div class="row-head" style="justify-content:space-between">
+        <span class="kicker" style="margin:0">📬 Contact inbox <span id="inbox-count" class="muted"></span></span>
+        <button class="btn btn-ghost btn-sm" id="inbox-reload">Reload</button>
+      </div>
+      <div id="inbox-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem"></div>
+    </section>
+
+    <section class="panel span-6 anim-rise" aria-label="App versions">
+      <span class="kicker">App versions</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <input class="input" id="v-name" placeholder="Name (StudiKitEZ)" style="font-size:.82rem" />
+        <input class="input" id="v-version" placeholder="Version (2.1.0)" style="font-size:.82rem" />
+        <input class="input" id="v-code" placeholder="Version code (21)" style="font-size:.82rem" />
+        <input class="input" id="v-size" placeholder="Size (18 MB)" style="font-size:.82rem" />
+        <input class="input" id="v-url" placeholder="Download URL (.apk)" style="font-size:.82rem;grid-column:1/-1" />
+        <input class="input" id="v-notes" placeholder="Notes / changelog" style="font-size:.82rem;grid-column:1/-1" />
+      </div>
+      <button class="btn btn-primary btn-sm" id="v-add" style="margin-top:.6rem">Add new version</button>
+      <div id="v-list" style="margin-top:.9rem;display:flex;flex-direction:column;gap:.4rem"></div>
+    </section>
+
+    <section class="panel span-6 anim-rise" style="--d:.05s" aria-label="Pending referrals">
+      <div class="row-head" style="justify-content:space-between">
+        <span class="kicker" style="margin:0">Pending referrals <span id="ref-count" class="muted"></span></span>
+        <button class="btn btn-ghost btn-sm" id="ref-reload">Reload</button>
+      </div>
+      <div id="ref-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem"></div>
+    </section>
+  </div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Admin route.</span>
+  <a href="index.html" style="font-size:.85rem">Home</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var F = null, db = null, me = null, users = [], visible = 20, filter = "";
+  var presenceTimer = null, forceTimer = null, target = null, editingId = null;
+
+  ui.load(true);
+  fb.requireLogin("admin.html").then(function (u) {
+    return fb.isAdmin(u.uid).then(function (ok) {
+      if (!ok) { location.href = "404.html"; throw new Error("not-admin"); }
+      return u;
+    });
+  }).then(function (u) {
+    me = u;
+    var r = fb.raw(); F = r.S._fs; db = r.S.sDb;
+    ui.nav(); ui.authArea(); ui.load(false);
+    loadUsers(); loadAnns(); loadPresence(); loadMod(); loadInbox(); loadRefs(); loadVersions();
+    presenceTimer = setInterval(loadPresence, 8000);
+  }).catch(function (e) {
+    if (String(e.message) !== "not-admin") ui.load(false);
+  });
+
+  function timeAgo(ms) {
+    if (!ms) return "—";
+    var s = Math.floor((Date.now() - ms) / 1000);
+    if (s < 60) return s + "s ago";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  function subActive(sub) {
+    if (!sub || sub.active !== true) return false;
+    if (sub.expiry == null) return true;
+    return sub.expiry > Date.now();
+  }
+  function subLabel(u) {
+    var sub = u.subscription;
+    if (!sub) return '<span class="chip">no sub</span>';
+    var on = subActive(sub);
+    var plan = { trial: "Trial 24h", monthly: "Monthly", lifetime: "Lifetime" }[sub.plan] || sub.plan || "?";
+    if (!on) return '<span class="chip">' + plan + " · expired</span>";
+    var exp = sub.expiry == null ? "never" : timeAgo(0).replace("ago", "") === "" ? "" : new Date(sub.expiry).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+    return '<span class="chip on">' + plan + (exp ? " · to " + exp : "") + "</span>";
+  }
+
+  /* ---------- stats ---------- */
+  function renderStats(onlineN) {
+    document.getElementById("st-total").textContent = users.length;
+    document.getElementById("st-banned").textContent = users.filter(function (u) { return u.banned; }).length;
+    document.getElementById("st-subs").textContent = users.filter(function (u) { return subActive(u.subscription); }).length;
+    if (onlineN !== undefined) document.getElementById("st-online").textContent = onlineN;
+  }
+
+  /* ---------- users ---------- */
+  function render() {
+    var q = filter.toLowerCase();
+    var list = q ? users.filter(function (u) { return (u.email + " " + u.displayName + " " + u.id).toLowerCase().indexOf(q) >= 0; }) : users;
+    var show = list.slice(0, visible);
+    document.getElementById("user-count").textContent = "(" + list.length + ")";
+    document.getElementById("empty").style.display = list.length ? "none" : "block";
+    var tb = document.getElementById("rows");
+    tb.innerHTML = "";
+    show.forEach(function (u) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td><div style='font-weight:700'></div><div class='mono muted' style='font-size:.68rem'></div></td>" +
+        "<td></td><td></td>" +
+        "<td><div style='display:flex;gap:.4rem;flex-wrap:wrap;align-items:center'>" +
+        "<button class='btn " + (u.banned ? "btn-secondary" : "btn-danger") + " btn-sm' data-a='ban'>" + (u.banned ? "Unban" : "Ban") + "</button>" +
+        "<select class='input' data-a='plan' style='min-height:34px;font-size:.75rem;padding:.2rem .4rem'><option value=''>Plan…</option><option value='trial'>Trial 24h</option><option value='monthly'>Monthly 30d</option><option value='lifetime'>Lifetime</option><option value='__revoke__'>Revoke</option></select>" +
+        "<button class='btn btn-secondary btn-sm' data-a='apply'>Set</button>" +
+        "<button class='btn btn-ghost btn-sm' data-a='msg'>Msg</button>" +
+        "</div></td>";
+      tr.children[0].children[0].textContent = u.displayName || "(no name)";
+      tr.children[0].children[1].textContent = u.email || u.mobile || u.id;
+      tr.children[1].innerHTML = (u.banned ? '<span class="chip bad">banned</span>' : '<span class="chip">ok</span>') + (u.role === "admin" ? ' <span class="chip adm">admin</span>' : "");
+      tr.children[2].innerHTML = subLabel(u);
+      tr.querySelector("[data-a='ban']").addEventListener("click", function () {
+        var to = !u.banned;
+        if (to && !confirm("Ban " + (u.email || u.id) + "?")) return;
+        F.setDoc(F.doc(db, "users", u.id), { banned: to }, { merge: true }).then(function () {
+          u.banned = to; ui.toast(to ? "Banned" : "Unbanned", u.email || u.id); renderStats(); render();
+        }).catch(function () { ui.toast("Failed", "Write denied"); });
+      });
+      tr.querySelector("[data-a='apply']").addEventListener("click", function () {
+        var v = tr.querySelector("[data-a='plan']").value;
+        if (!v) return ui.toast("Pick a plan", "Choose a plan first");
+        var now = Date.now();
+        var sub = v === "__revoke__"
+          ? { active: false, plan: (u.subscription && u.subscription.plan) || "monthly", expiry: now }
+          : { active: true, plan: v, expiry: v === "lifetime" ? null : now + (v === "trial" ? 86400000 : 2592000000), startedAt: now, grantedBy: me.email || "admin" };
+        F.setDoc(F.doc(db, "users", u.id), { subscription: sub }, { merge: true }).then(function () {
+          u.subscription = sub;
+          ui.toast("Saved", (u.email || u.id) + " → " + (v === "__revoke__" ? "revoked" : v));
+          renderStats(); render();
+        }).catch(function () { ui.toast("Failed", "Write denied"); });
+      });
+      tr.querySelector("[data-a='msg']").addEventListener("click", function () {
+        selectTarget(u.id, u.displayName || u.email || u.id);
+        document.getElementById("msg-text").focus();
+      });
+      tb.appendChild(tr);
+    });
+    var more = document.getElementById("more-btn");
+    if (visible < list.length) { more.style.display = "inline-flex"; more.textContent = "Load more (" + (list.length - visible) + ")"; }
+    else more.style.display = "none";
+  }
+  function loadUsers() {
+    document.getElementById("rows").innerHTML = "<tr><td colspan='4' class='muted'>Loading…</td></tr>";
+    F.getDocs(F.query(F.collection(db, "users"), F.orderBy("lastLoginAt", "desc"), F.limit(200))).then(function (snap) {
+      users = [];
+      snap.forEach(function (d) {
+        var v = d.data() || {};
+        users.push({ id: d.id, email: v.email || "", mobile: v.mobile || "", displayName: v.displayName || "", banned: !!v.banned, role: v.role || "user", subscription: v.subscription || null });
+      });
+      renderStats(); render();
+    }).catch(function () {
+      ui.toast("Load failed", "Couldn't list users");
+      render();
+    });
+  }
+  document.getElementById("more-btn").addEventListener("click", function () { visible += 20; render(); });
+  document.getElementById("q").addEventListener("input", function () { filter = this.value; visible = 20; render(); });
+  document.getElementById("reload-btn").addEventListener("click", loadUsers);
+
+  /* ---------- presence ---------- */
+  function loadPresence() {
+    var list = document.getElementById("presence-list");
+    if (!list || !F) return;
+    F.getDocs(F.query(F.collection(db, "presence"), F.orderBy("at", "desc"), F.limit(50))).then(function (snap) {
+      var now = Date.now(), live = [];
+      snap.forEach(function (d) {
+        var v = d.data() || {};
+        if (now - (v.at || 0) < 180000) live.push(Object.assign({ uid: d.id }, v));
+      });
+      document.getElementById("presence-count").textContent = "(" + live.length + ")";
+      document.getElementById("st-online") && renderStats(live.length);
+      document.getElementById("presence-empty").style.display = live.length ? "none" : "block";
+      list.innerHTML = "";
+      live.forEach(function (p) {
+        var row = document.createElement("div");
+        row.className = "row-card";
+        row.style.padding = ".6rem .8rem";
+        row.innerHTML = '<div class="row-head"><span class="live-dot"></span><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.85rem"></div><div class="mono muted" style="font-size:.65rem"></div></div><span class="mono muted" style="font-size:.62rem"></span><button class="btn btn-ghost btn-sm" data-a="msg">Msg</button></div>';
+        row.children[0].children[1].children[0].textContent = p.name || p.uid;
+        row.children[0].children[1].children[1].textContent = (p.action || "browsing") + " · " + p.page;
+        row.children[0].children[2].textContent = timeAgo(p.at);
+        row.querySelector("[data-a='msg']").addEventListener("click", function () { selectTarget(p.uid, p.name || p.uid); });
+        list.appendChild(row);
+      });
+    }).catch(function () {});
+  }
+  document.getElementById("presence-reload").addEventListener("click", loadPresence);
+
+  /* ---------- message a user: general vs force ---------- */
+  function selectTarget(uid, name) {
+    target = { uid: uid, name: name };
+    document.getElementById("msg-target").textContent = "→ " + name;
+    document.getElementById("msg-general").disabled = false;
+    document.getElementById("msg-force").disabled = false;
+  }
+  document.getElementById("msg-q").addEventListener("input", function () {
+    var t = this.value, box = document.getElementById("msg-results");
+    if (t.trim().length < 2) { box.innerHTML = ""; return; }
+    fb.searchUsers(t, 8).then(function (rows) {
+      box.innerHTML = rows.length ? "" : '<div class="muted" style="font-size:.75rem">No users found.</div>';
+      rows.forEach(function (r) {
+        var b = document.createElement("button");
+        b.className = "btn btn-ghost btn-sm"; b.style.justifyContent = "flex-start"; b.textContent = (r.name || r.uid).slice(0, 34);
+        b.addEventListener("click", function () { selectTarget(r.uid, r.name); box.innerHTML = ""; document.getElementById("msg-q").value = ""; });
+        box.appendChild(b);
+      });
+    }).catch(function () {});
+  });
+  document.getElementById("msg-general").addEventListener("click", function () {
+    if (!target) return;
+    var text = document.getElementById("msg-text").value.trim();
+    if (!text) return ui.toast("Empty", "Type a message first");
+    var mid = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    F.setDoc(F.doc(db, "users", target.uid, "inbox", mid), {
+      from: me.uid, fromName: "Admin", text: text.slice(0, 500), at: Date.now(), read: false, kind: "general"
+    }).then(function () { ui.toast("Sent", "General message delivered to " + target.name); document.getElementById("msg-text").value = ""; })
+      .catch(function () { ui.toast("Failed", "Write denied"); });
+  });
+  document.getElementById("msg-force").addEventListener("click", function () {
+    if (!target) return;
+    var text = document.getElementById("msg-text").value.trim();
+    if (!text) return ui.toast("Empty", "Type a message first");
+    startForce(text);
+  });
+  function startForce(text) {
+    F.setDoc(F.doc(db, "forceMsgs", target.uid), {
+      text: text.slice(0, 1000), from: me.uid, fromName: "Admin", adminAt: Date.now(), allowLeave: false, sentAt: Date.now()
+    }).then(function () {
+      ui.toast("Force message live", target.name + " is now locked on it");
+      document.getElementById("force-end").style.display = "";
+      document.getElementById("force-allow").style.display = "";
+      document.getElementById("msg-text").value = "";
+      if (forceTimer) clearInterval(forceTimer);
+      /* Heartbeat: while this panel keeps beating, the user stays locked.
+         Stop it (close panel / go idle) and the user is released after 2 min. */
+      forceTimer = setInterval(function () {
+        if (!target) return;
+        F.setDoc(F.doc(db, "forceMsgs", target.uid), { adminAt: Date.now() }, { merge: true }).catch(function () {});
+      }, 20000);
+    }).catch(function () { ui.toast("Failed", "Write denied"); });
+  }
+  function stopForce(clearOnly) {
+    if (!target) return;
+    var p = clearOnly
+      ? F.setDoc(F.doc(db, "forceMsgs", target.uid), { adminAt: 0 }, { merge: true })
+      : F.deleteDoc(F.doc(db, "forceMsgs", target.uid));
+    p.then(function () {
+      if (forceTimer) { clearInterval(forceTimer); forceTimer = null; }
+      document.getElementById("force-end").style.display = "none";
+      document.getElementById("force-allow").style.display = "none";
+      ui.toast(clearOnly ? "Released" : "Ended", "User can leave now");
+    }).catch(function () { ui.toast("Failed", "Write denied"); });
+  }
+  document.getElementById("force-end").addEventListener("click", function () { stopForce(false); });
+  document.getElementById("force-allow").addEventListener("click", function () {
+    if (!target) return;
+    F.setDoc(F.doc(db, "forceMsgs", target.uid), { allowLeave: true, adminAt: 0 }, { merge: true }).then(function () {
+      if (forceTimer) { clearInterval(forceTimer); forceTimer = null; }
+      document.getElementById("force-end").style.display = "none";
+      document.getElementById("force-allow").style.display = "none";
+      ui.toast("Allowed", "User may leave the force page");
+    }).catch(function () { ui.toast("Failed", "Write denied"); });
+  });
+
+  /* ---------- announcements ---------- */
+  function resetAnnForm() {
+    editingId = null;
+    document.getElementById("ann-title").value = "";
+    document.getElementById("ann-body").value = "";
+    document.getElementById("ann-link").value = "";
+    document.getElementById("ann-send").textContent = "Publish to home";
+    document.getElementById("ann-cancel").style.display = "none";
+  }
+  document.getElementById("ann-cancel").addEventListener("click", resetAnnForm);
+  document.getElementById("ann-send").addEventListener("click", function () {
+    var title = document.getElementById("ann-title").value.trim();
+    var body = document.getElementById("ann-body").value.trim();
+    var link = document.getElementById("ann-link").value.trim();
+    if (!title || !body) return ui.toast("Missing fields", "Title and message required");
+    var p;
+    if (editingId) {
+      p = F.setDoc(F.doc(db, "announcements", editingId), { title: title, body: body, link: link || "", updatedAt: Date.now() }, { merge: true });
+    } else {
+      p = F.setDoc(F.doc(db, "announcements", Date.now().toString()), { title: title, body: body, link: link || "", createdAt: Date.now(), active: true });
+    }
+    p.then(function () { ui.toast("Published", "Live on home screen"); resetAnnForm(); loadAnns(); })
+      .catch(function () { ui.toast("Failed", "Write denied"); });
+  });
+  function loadAnns() {
+    var list = document.getElementById("ann-list");
+    if (!list) return;
+    list.innerHTML = '<div class="muted" style="font-size:.75rem">Loading…</div>';
+    F.getDocs(F.query(F.collection(db, "announcements"), F.orderBy("createdAt", "desc"), F.limit(8))).then(function (snap) {
+      list.innerHTML = snap.empty ? '<div class="muted" style="font-size:.75rem">None yet — publish one above.</div>' : "";
+      snap.forEach(function (d) {
+        var a = Object.assign({ id: d.id }, d.data() || {});
+        var el = document.createElement("div");
+        el.className = "row-card";
+        el.style.padding = ".6rem .8rem";
+        el.innerHTML = '<div style="font-weight:700;font-size:.85rem"></div><div class="muted" style="font-size:.78rem;white-space:pre-wrap"></div>' +
+          '<div class="act-bar"><button class="btn btn-ghost btn-sm" data-a="edit">Edit</button><button class="btn btn-ghost btn-sm" data-a="del">Delete</button></div>';
+        el.querySelector("div").textContent = a.title || "(no title)";
+        el.querySelectorAll("div")[1].textContent = (a.body || "") + (a.link ? " → " + a.link : "");
+        el.querySelector("[data-a='edit']").addEventListener("click", function () {
+          editingId = a.id;
+          document.getElementById("ann-title").value = a.title || "";
+          document.getElementById("ann-body").value = a.body || "";
+          document.getElementById("ann-link").value = a.link || "";
+          document.getElementById("ann-send").textContent = "Save changes";
+          document.getElementById("ann-cancel").style.display = "";
+          document.getElementById("ann-title").focus();
+        });
+        el.querySelector("[data-a='del']").addEventListener("click", function () {
+          if (!confirm("Delete this announcement?")) return;
+          F.deleteDoc(F.doc(db, "announcements", a.id)).then(function () { ui.toast("Deleted", "Removed from home"); loadAnns(); })
+            .catch(function () { ui.toast("Failed", "Delete denied"); });
+        });
+        list.appendChild(el);
+      });
+    }).catch(function () { list.innerHTML = '<div class="muted" style="font-size:.75rem">Couldn\'t load.</div>'; });
+  }
+
+  /* ---------- moderation ---------- */
+  function loadMod() {
+    var rlist = document.getElementById("report-list"), mlist = document.getElementById("mod-list");
+    if (!rlist || !mlist) return;
+    F.getDocs(F.query(F.collection(db, "post_reports"), F.orderBy("at", "desc"), F.limit(15))).then(function (snap) {
+      var reps = [];
+      snap.forEach(function (d) { reps.push(Object.assign({ id: d.id }, d.data() || {})); });
+      document.getElementById("mod-count").textContent = "(" + reps.length + " reports)";
+      rlist.innerHTML = reps.length ? "" : '<div class="muted" style="font-size:.78rem">No reports 🎉</div>';
+      reps.forEach(function (r) {
+        var row = document.createElement("div");
+        row.className = "row-card";
+        row.style.padding = ".55rem .75rem";
+        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.8rem"></div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-ghost btn-sm" data-a="del">Del post</button><button class="btn btn-ghost btn-sm" data-a="dis">Dismiss</button></div>';
+        row.querySelector("div div").textContent = r.reason || "Reported";
+        row.querySelector("div div + div").textContent = "post " + String(r.postId || "").slice(0, 14) + "… · " + timeAgo(r.at);
+        row.querySelector("[data-a='del']").addEventListener("click", function () {
+          if (!confirm("Delete the reported post?")) return;
+          F.deleteDoc(F.doc(db, "posts", r.postId)).then(function () { return F.deleteDoc(F.doc(db, "post_reports", r.id)); })
+            .then(function () { ui.toast("Deleted", "Post + report removed"); loadMod(); })
+            .catch(function () { ui.toast("Failed", "Denied"); });
+        });
+        row.querySelector("[data-a='dis']").addEventListener("click", function () {
+          F.deleteDoc(F.doc(db, "post_reports", r.id)).then(function () { loadMod(); }).catch(function () {});
+        });
+        rlist.appendChild(row);
+      });
+    }).catch(function () { rlist.innerHTML = '<div class="muted" style="font-size:.78rem">Couldn\'t load reports.</div>'; });
+    F.getDocs(F.query(F.collection(db, "posts"), F.orderBy("at", "desc"), F.limit(8))).then(function (snap) {
+      mlist.innerHTML = snap.empty ? '<div class="muted" style="font-size:.78rem">No posts yet.</div>' : "";
+      snap.forEach(function (d) {
+        var p = d.data() || {};
+        var row = document.createElement("div");
+        row.className = "row-card";
+        row.style.padding = ".55rem .75rem";
+        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.8rem"></div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-ghost btn-sm">Delete</button></div>';
+        row.querySelector("div div").textContent = p.title || "(no title)";
+        row.querySelector("div div + div").textContent = (p.authorName || "?") + " · " + (p.likeCount || 0) + " likes · " + timeAgo(p.at);
+        row.querySelector("button").addEventListener("click", function () {
+          if (!confirm("Delete this post?")) return;
+          F.deleteDoc(F.doc(db, "posts", d.id)).then(function () { ui.toast("Deleted", "Post removed"); loadMod(); })
+            .catch(function () { ui.toast("Failed", "Denied"); });
+        });
+        mlist.appendChild(row);
+      });
+    }).catch(function () { mlist.innerHTML = '<div class="muted" style="font-size:.78rem">Couldn\'t load posts.</div>'; });
+  }
+  document.getElementById("mod-reload").addEventListener("click", loadMod);
+
+  /* ---------- contacts ---------- */
+  function loadInbox() {
+    var list = document.getElementById("inbox-list");
+    if (!list) return;
+    F.getDocs(F.query(F.collection(db, "contact_messages"), F.orderBy("at", "desc"), F.limit(15))).then(function (snap) {
+      var items = [];
+      snap.forEach(function (d) { items.push(Object.assign({ id: d.id }, d.data() || {})); });
+      document.getElementById("inbox-count").textContent = "(" + items.filter(function (m) { return m.status !== "resolved"; }).length + " open)";
+      list.innerHTML = items.length ? "" : '<div class="muted" style="font-size:.78rem">Inbox zero.</div>';
+      items.forEach(function (m) {
+        var el = document.createElement("div");
+        el.className = "row-card";
+        el.style.padding = ".55rem .75rem";
+        el.style.opacity = m.status === "resolved" ? ".55" : "1";
+        el.innerHTML = '<div style="font-weight:700;font-size:.82rem"></div><div class="muted" style="font-size:.78rem;white-space:pre-wrap"></div>' +
+          '<div class="act-bar">' + (m.status !== "resolved" ? '<button class="btn btn-ghost btn-sm" data-a="ok">Resolve</button>' : "") + '<button class="btn btn-ghost btn-sm" data-a="del">Delete</button></div>';
+        el.querySelector("div").textContent = m.subject || "(no subject)";
+        el.querySelectorAll("div")[1].textContent = (m.name || "User") + (m.email ? " · " + m.email : "") + " — " + (m.message || "");
+        var ok = el.querySelector("[data-a='ok']");
+        if (ok) ok.addEventListener("click", function () {
+          F.setDoc(F.doc(db, "contact_messages", m.id), { status: "resolved" }, { merge: true }).then(function () { loadInbox(); }).catch(function () {});
+        });
+        el.querySelector("[data-a='del']").addEventListener("click", function () {
+          if (!confirm("Delete?")) return;
+          F.deleteDoc(F.doc(db, "contact_messages", m.id)).then(function () { loadInbox(); }).catch(function () {});
+        });
+        list.appendChild(el);
+      });
+    }).catch(function () { list.innerHTML = '<div class="muted" style="font-size:.78rem">Couldn\'t load.</div>'; });
+  }
+  document.getElementById("inbox-reload").addEventListener("click", loadInbox);
+
+  /* ---------- app versions ---------- */
+  function loadVersions() {
+    var list = document.getElementById("v-list");
+    fb.appVersions().then(function (rows) {
+      list.innerHTML = rows.length ? "" : '<div class="muted" style="font-size:.75rem">No versions published.</div>';
+      rows.forEach(function (v) {
+        var el = document.createElement("div");
+        el.className = "row-card";
+        el.style.padding = ".5rem .7rem";
+        el.innerHTML = '<div class="row-head"><span class="chip on">v' + ui.esc(v.version || "?") + '</span><span class="mono muted" style="font-size:.65rem"></span><span class="muted" style="font-size:.72rem;flex:1;min-width:0"></span><button class="btn btn-ghost btn-sm">Delete</button></div>';
+        el.querySelector(".chip + span").textContent = "code " + (v.versionCode || "");
+        el.querySelector(".chip + span + span").textContent = v.notes || v.url || "";
+        el.querySelector("button").addEventListener("click", function () {
+          if (!confirm("Delete version " + v.version + "?")) return;
+          F.deleteDoc(F.doc(db, "app", v.id)).then(function () { ui.toast("Deleted", "Version removed"); loadVersions(); })
+            .catch(function () { ui.toast("Failed", "Denied"); });
+        });
+        list.appendChild(el);
+      });
+    }).catch(function () {});
+  }
+  document.getElementById("v-add").addEventListener("click", function () {
+    var name = document.getElementById("v-name").value.trim() || "StudiKitEZ";
+    var version = document.getElementById("v-version").value.trim();
+    var code = parseInt(document.getElementById("v-code").value.trim(), 10);
+    var url = document.getElementById("v-url").value.trim();
+    var size = document.getElementById("v-size").value.trim();
+    var notes = document.getElementById("v-notes").value.trim();
+    if (!version || !code || !url) return ui.toast("Missing", "Version, version code and URL required");
+    if (!/^https?:\/\//.test(url)) return ui.toast("Invalid URL", "Must start with https://");
+    var slug = name.toLowerCase().replace(/\W+/g, "_") + "_" + code;
+    F.setDoc(F.doc(db, "app", slug), { name: name, version: version, versionCode: code, url: url, size: size, notes: notes, createdAt: Date.now() })
+      .then(function () {
+        ui.toast("Published", "v" + version + " live on app page");
+        ["v-name", "v-version", "v-code", "v-size", "v-url", "v-notes"].forEach(function (id) { document.getElementById(id).value = ""; });
+        loadVersions();
+      }).catch(function () { ui.toast("Failed", "Write denied"); });
+  });
+
+  /* ---------- referrals ---------- */
+  function loadRefs() {
+    var list = document.getElementById("ref-list");
+    if (!list) return;
+    F.getDocs(F.query(F.collection(db, "referral_claims"), F.orderBy("at", "desc"), F.limit(20))).then(function (snap) {
+      var pend = [];
+      snap.forEach(function (d) { var v = d.data() || {}; if (v.granted !== true) pend.push(Object.assign({ id: d.id }, v)); });
+      document.getElementById("ref-count").textContent = "(" + pend.length + ")";
+      list.innerHTML = pend.length ? "" : '<div class="muted" style="font-size:.78rem">Nothing pending.</div>';
+      pend.forEach(function (c) {
+        var row = document.createElement("div");
+        row.className = "row-card";
+        row.style.padding = ".55rem .75rem";
+        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.82rem">+1 day ad-free</div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-primary btn-sm">Grant</button></div>';
+        row.querySelector("div div + div").textContent = "new: " + String(c.id).slice(0, 10) + "… · ref: " + String(c.by || "").slice(0, 10) + "… · " + timeAgo(c.at);
+        row.querySelector("button").addEventListener("click", function () {
+          var uref = F.doc(db, "users", c.by);
+          F.getDoc(uref).then(function (us) {
+            var old = us.exists() ? (us.data().freeUntil || 0) : 0;
+            return F.setDoc(uref, { freeUntil: Math.max(Date.now(), old) + 86400000 }, { merge: true });
+          }).then(function () { return F.setDoc(F.doc(db, "referral_claims", c.id), { granted: true }, { merge: true }); })
+            .then(function () { ui.toast("Granted", "+1 day ad-free"); loadRefs(); })
+            .catch(function () { ui.toast("Failed", "Denied"); });
+        });
+        list.appendChild(row);
+      });
+    }).catch(function () {});
+  }
+  document.getElementById("ref-reload").addEventListener("click", loadRefs);
+})();
+</script>
+</body>
+</html>

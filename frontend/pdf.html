@@ -70,7 +70,7 @@
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
   var courseId = qp("course") || "", contentId = qp("content") || "";
   var user = null, pdfUrl = "", pdfTitle = "Document", pdf = null, page = 1, scale = null;
-  ui.nav(); ui.telegram();
+  ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
     location.href = "content.html?id=" + courseId;
   });
@@ -101,6 +101,7 @@
     pdfTitle = d.title || pdfTitle; pdfUrl = d.file_url;
     document.getElementById("doc-title").textContent = pdfTitle;
     document.title = "StudiKitEZ — " + pdfTitle;
+  SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
     try {
       pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise;
       await renderAll();

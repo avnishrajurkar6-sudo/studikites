@@ -275,37 +275,190 @@ window.SK.fb = (function () {
       return out;
     } catch (e) { return []; }
   }
-  /* realtime room chat (Firebase Realtime Database, studiki project) */
-  var rtdbDb = null, rtdbMod = null;
-  async function rtdb() {
-    if (rtdbDb) return { db: rtdbDb, mod: rtdbMod };
-    var cfg = await window.SK.api.getConfig();
-    var url = cfg.STUDIKI && cfg.STUDIKI.databaseURL;
-    if (!url) throw new Error("Realtime Database is not enabled");
-    var appMod = await import(V + "firebase-app.js");
-    rtdbMod = await import(V + "firebase-database.js");
-    var full = Object.assign({}, cfg.STUDIKI, { databaseURL: url });
-    var app = appMod.getApps().find(function (a) { return a.name === "studiki-rtdb"; }) || appMod.initializeApp(full, "studiki-rtdb");
-    rtdbDb = rtdbMod.getDatabase(app);
-    return { db: rtdbDb, mod: rtdbMod };
-  }
+  /* Room chat — Firestore (RTDB never existed on this project, so chat moved here). */
   async function sendRoomChat(roomId, text) {
     var me = await currentUser(); if (!me) throw new Error("signin");
-    var r = await rtdb();
-    await r.mod.push(r.mod.ref(r.db, "rooms/" + roomId + "/chat"), {
-      uid: me.uid, name: (me.displayName || "learner").slice(0, 40),
+    await ensure();
+    await S._fs.addDoc(S._fs.collection(S.sDb, "focus_rooms", roomId, "messages"), {
+      uid: me.uid, name: String(me.displayName || "learner").slice(0, 40),
       text: String(text).slice(0, 300), at: Date.now(),
     });
   }
   function watchRoomChat(roomId, cb) {
     var off = null, dead = false;
-    rtdb().then(function (r) {
+    ensure().then(function () {
       if (dead) return;
-      var q = r.mod.query(r.mod.ref(r.db, "rooms/" + roomId + "/chat"), r.mod.limitToLast(40));
-      off = r.mod.onChildAdded(q, function (snap) { cb(snap.val()); });
+      var q = S._fs.query(S._fs.collection(S.sDb, "focus_rooms", roomId, "messages"), S._fs.orderBy("at", "desc"), S._fs.limit(40));
+      var seen = false;
+      off = S._fs.onSnapshot(q, function (snap) {
+        if (!seen) {
+          seen = true;
+          if (snap.empty) return;
+          var all = []; snap.forEach(function (d) { all.push(d.data()); });
+          all.reverse().forEach(cb);
+          return;
+        }
+        snap.docChanges().forEach(function (c) { if (c.type === "added") cb(c.doc.data()); });
+      }, function () { if (!dead) cb(null); });
     }).catch(function () { if (!dead) cb(null); });
     return function () { dead = true; try { if (off) off(); } catch (e) {} };
   }
+
+  /* Presence — who is online and what they're doing (admin sees this). */
+  var presTimer = null, presNow = { page: "", action: "" };
+  function presenceBeat(page, action) {
+    if (page !== undefined) presNow.page = String(page || "").slice(0, 40);
+    if (action !== undefined) presNow.action = String(action || "").slice(0, 60);
+    if (!presNow.page) presNow.page = (location.pathname.split("/").pop() || "index.html");
+    currentUser().then(function (me) {
+      if (!me) return;
+      return ensure().then(function () {
+        var ref = S._fs.doc(S.sDb, "presence", me.uid);
+        var payload = { name: String(me.displayName || me.email || "learner").slice(0, 50), page: presNow.page, action: presNow.action, at: Date.now() };
+        return S._fs.setDoc(ref, payload, { merge: true });
+      });
+    }).catch(function () {});
+    if (presTimer) clearInterval(presTimer);
+    presTimer = setInterval(function () {
+      currentUser().then(function (me) {
+        if (!me) return clearInterval(presTimer);
+        return S._fs.setDoc(S._fs.doc(S.sDb, "presence", me.uid),
+          { name: String(me.displayName || me.email || "learner").slice(0, 50), page: presNow.page, action: presNow.action, at: Date.now() }, { merge: true });
+      }).catch(function () {});
+    }, 15000);
+  }
+
+  /* Admin check — role from users/{uid}.role, bootstrapped via ADMIN_EMAILS. */
+  async function isAdmin(uid) {
+    try {
+      var d = await userDoc(uid);
+      if (d && d.role === "admin") return true;
+      var cfg = await window.SK.api.getConfig();
+      var list = String(cfg.ADMIN_EMAILS || "").split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+      var email = (d && d.email) || "";
+      if (email && list.indexOf(email.toLowerCase()) >= 0) {
+        await ensure();
+        await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid), { role: "admin" }, { merge: true });
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /* Messaging: DM threads + one common community thread + admin general/force. */
+  function threadId(a, b) { return [a, b].sort().join("__"); }
+  async function sendMsg(thread, text) {
+    var me = await currentUser(); if (!me) throw new Error("signin");
+    await ensure();
+    var t = String(text).slice(0, 1000), now = Date.now(), mid = now + "_" + Math.random().toString(36).slice(2, 8);
+    await S._fs.setDoc(S._fs.doc(S.sDb, "threads", thread, "messages", mid),
+      { from: me.uid, name: String(me.displayName || "learner").slice(0, 40), text: t, at: now });
+    await S._fs.setDoc(S._fs.doc(S.sDb, "threads", thread),
+      { id: thread, lastText: t.slice(0, 80), lastAt: now, lastBy: me.uid, community: thread === "community" }, { merge: true });
+    if (thread !== "community") {
+      var other = thread.split("__").filter(function (x) { return x && x !== me.uid; })[0];
+      if (other) {
+        await S._fs.setDoc(S._fs.doc(S.sDb, "users", other, "inbox", mid),
+          { from: me.uid, fromName: String(me.displayName || "learner").slice(0, 40), text: t.slice(0, 200), at: now, read: false, kind: "general", thread: thread });
+        await S._fs.setDoc(S._fs.doc(S.sDb, "users", me.uid, "inbox", mid),
+          { from: me.uid, fromName: String(me.displayName || "learner").slice(0, 40), text: t.slice(0, 200), at: now, read: true, kind: "sent", thread: thread, to: other });
+      }
+    }
+  }
+  function watchThread(thread, cb) {
+    var off = null, dead = false;
+    ensure().then(function () {
+      if (dead) return;
+      var q = S._fs.query(S._fs.collection(S.sDb, "threads", thread, "messages"), S._fs.orderBy("at", "asc"), S._fs.limit(100));
+      off = S._fs.onSnapshot(q, function (snap) {
+        snap.docChanges().forEach(function (c) { if (c.type === "added") cb(c.doc.data()); });
+      }, function () { cb(null); });
+    }).catch(function () { cb(null); });
+    return function () { dead = true; try { if (off) off(); } catch (e) {} };
+  }
+  async function myThreads() {
+    try {
+      var me = await currentUser(); if (!me) return [];
+      await ensure();
+      var q = S._fs.query(S._fs.collection(S.sDb, "threads"), S._fs.where("id", ">=", me.uid), S._fs.limit(40));
+      var snap = await S._fs.getDocs(q), out = [];
+      snap.forEach(function (d) { var v = d.data() || {}; if ((v.id || "").indexOf(me.uid + "__") === 0 || (v.id || "").indexOf("__" + me.uid) >= 0) out.push(v); });
+      var c = await S._fs.getDoc(S._fs.doc(S.sDb, "threads", "community"));
+      if (c.exists()) out.unshift(c.data());
+      return out.sort(function (a, b) { return (b.lastAt || 0) - (a.lastAt || 0); });
+    } catch (e) { return []; }
+  }
+  function watchInbox(uid, cb) {
+    var off = null, dead = false;
+    ensure().then(function () {
+      if (dead) return;
+      var q = S._fs.query(S._fs.collection(S.sDb, "users", uid, "inbox"), S._fs.orderBy("at", "desc"), S._fs.limit(30));
+      off = S._fs.onSnapshot(q, function (snap) {
+        var rows = []; snap.forEach(function (d) { rows.push(Object.assign({ id: d.id }, d.data() || {})); });
+        cb(rows);
+      }, function () { cb(null); });
+    }).catch(function () { cb(null); });
+    return function () { dead = true; try { if (off) off(); } catch (e) {} };
+  }
+  /* Force msg: admin writes forceMsgs/{uid}; every page redirects the user to
+     forcemsg.html while adminAt is fresh (<2 min) and allowLeave is false. */
+  function watchForce(uid, cb) {
+    var off = null, dead = false;
+    ensure().then(function () {
+      if (dead) return;
+      off = S._fs.onSnapshot(S._fs.doc(S.sDb, "forceMsgs", uid), function (s) {
+        cb(s.exists() ? s.data() : null);
+      }, function () { cb(null); });
+    }).catch(function () { cb(null); });
+    return function () { dead = true; try { if (off) off(); } catch (e) {} };
+  }
+  function forceActive(f) {
+    if (!f) return false;
+    if (f.allowLeave === true) return false;
+    return Date.now() - (f.adminAt || 0) < 120000;
+  }
+  function searchUsers(term, n) {
+    try {
+      var t = String(term || "").trim().toLowerCase();
+      if (t.length < 2) return Promise.resolve([]);
+      return ensure().then(function () {
+        var q = S._fs.query(S._fs.collection(S.sDb, "users"), S._fs.limit(300));
+        return S._fs.getDocs(q).then(function (snap) {
+          var out = [];
+          snap.forEach(function (d) {
+            var v = d.data() || {};
+            var hay = String(v.displayName || "") + " " + String(v.email || "") + " " + d.id;
+            if (hay.toLowerCase().indexOf(t) >= 0 && out.length < (n || 8)) out.push({ uid: d.id, name: v.displayName || v.email || d.id, email: v.email || "" });
+          });
+          return out;
+        });
+      });
+    } catch (e) { return Promise.resolve([]); }
+  }
+
+  /* App versions (admin publishes, app.html downloads latest). */
+  async function appLatest() {
+    try {
+      await ensure();
+      var q = S._fs.query(S._fs.collection(S.sDb, "app"), S._fs.orderBy("versionCode", "desc"), S._fs.limit(1));
+      var snap = await S._fs.getDocs(q);
+      if (snap.empty) return null;
+      var d = snap.docs[0];
+      return Object.assign({ id: d.id }, d.data());
+    } catch (e) { return null; }
+  }
+  async function appVersions() {
+    try {
+      await ensure();
+      var q = S._fs.query(S._fs.collection(S.sDb, "app"), S._fs.orderBy("versionCode", "desc"), S._fs.limit(8));
+      var snap = await S._fs.getDocs(q), out = [];
+      snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data() || {})); });
+      return out;
+    } catch (e) { return []; }
+  }
+
+  /* Raw access for heavy pages (admin/posts) — uses the same initialized db. */
+  function raw() { return { get S() { return S; } }; }
   async function studyLog(mins) {
     try {
       var me = await currentUser(); if (!me) return;
@@ -353,7 +506,7 @@ window.SK.fb = (function () {
       await ensure();
       var snap = await S._fs.getDocs(S._fs.query(S._fs.collection(S.sDb, "announcements"), S._fs.orderBy("createdAt", "desc"), S._fs.limit(n || 3)));
       var out = [];
-      snap.forEach(function (d) { var a = d.data() || {}; if (a.active !== false) out.push({ title: a.title || "Announcement", body: a.body || "" }); });
+      snap.forEach(function (d) { var a = d.data() || {}; if (a.active !== false) out.push({ id: d.id, title: a.title || "Announcement", body: a.body || "", link: a.link || "" }); });
       return out;
     } catch (e) { return []; }
   }
@@ -376,5 +529,5 @@ window.SK.fb = (function () {
     return ids;
   }
 
-  return { ensure: ensure, currentUser: currentUser, userDoc: userDoc, requireLogin: requireLogin, signOut: signOut, banCheck: banCheck, phoneSession: phoneSession, idToken: idToken, authHeaders: authHeaders, syncPhone: syncPhone, syncGoogle: syncGoogle, saveProfile: saveProfile, checkPhone: checkPhone, mintKey: mintKey, progress: progress, saveProgress: saveProgress, gamification: gamification, activity: activity, dayKey: dayKey, captureReferral: captureReferral, consumeReferral: consumeReferral, claimRewards: claimRewards, myReferrals: myReferrals, focusJoin: focusJoin, focusRoster: focusRoster, focusRooms: focusRooms, sendRoomChat: sendRoomChat, watchRoomChat: watchRoomChat, studyLog: studyLog, saveNote: saveNote, listNotes: listNotes, sendChat: sendChat, listChat: listChat, announcements: announcements, postsRecent: postsRecent, enrolled: enrolled, toggleEnroll: toggleEnroll };
+  return { ensure: ensure, currentUser: currentUser, userDoc: userDoc, requireLogin: requireLogin, signOut: signOut, banCheck: banCheck, phoneSession: phoneSession, idToken: idToken, authHeaders: authHeaders, syncPhone: syncPhone, syncGoogle: syncGoogle, saveProfile: saveProfile, checkPhone: checkPhone, mintKey: mintKey, progress: progress, saveProgress: saveProgress, gamification: gamification, activity: activity, dayKey: dayKey, captureReferral: captureReferral, consumeReferral: consumeReferral, claimRewards: claimRewards, myReferrals: myReferrals, focusJoin: focusJoin, focusRoster: focusRoster, focusRooms: focusRooms, sendRoomChat: sendRoomChat, watchRoomChat: watchRoomChat, studyLog: studyLog, saveNote: saveNote, listNotes: listNotes, sendChat: sendChat, listChat: listChat, announcements: announcements, postsRecent: postsRecent, enrolled: enrolled, toggleEnroll: toggleEnroll, presenceBeat: presenceBeat, isAdmin: isAdmin, threadId: threadId, sendMsg: sendMsg, watchThread: watchThread, myThreads: myThreads, watchInbox: watchInbox, watchForce: watchForce, forceActive: forceActive, searchUsers: searchUsers, appLatest: appLatest, appVersions: appVersions, raw: raw };
 })();

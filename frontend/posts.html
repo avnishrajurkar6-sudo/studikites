@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Community Posts — StudiKitEZ</title>
+<meta name="description" content="Share study ideas, ask doubts and discuss with the StudiKitEZ community." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="posts.html" class="on">Posts</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="posts.html">Posts</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:46rem">
+  <div class="page-head anim-rise">
+    <span class="kicker">Community</span>
+    <h1>Posts</h1>
+    <p>Share ideas, ask doubts, help others. Be kind — posts can be reported and removed.</p>
+  </div>
+
+  <section class="panel anim-rise" style="--d:.05s" aria-label="Compose">
+    <span class="kicker">New post</span>
+    <div id="composer-on" style="display:none">
+      <input class="input" id="post-title" maxlength="120" placeholder="Title (e.g. How to remember redox reactions?)" style="margin-bottom:.6rem" />
+      <textarea class="input" id="post-body" rows="3" maxlength="5000" placeholder="Write your idea, doubt or tip…" style="resize:vertical"></textarea>
+      <button class="btn btn-primary btn-sm" id="post-send" style="margin-top:.6rem">Post →</button>
+    </div>
+    <div id="composer-off" style="display:none">
+      <p class="muted" style="margin:0 0 .8rem;font-size:.9rem">Sign in to post. Reading is open to everyone.</p>
+      <a class="btn btn-secondary btn-sm" href="login.html?next=posts.html">Sign in to post</a>
+    </div>
+  </section>
+
+  <div id="feed" style="margin-top:1.2rem" aria-live="polite"></div>
+  <div id="feed-loading" style="display:grid;place-items:center;padding:2.5rem 0"><div class="spinner"></div></div>
+  <div id="feed-empty" class="empty" style="display:none"><h3>No posts yet</h3><p>Be the first to share something!</p></div>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.85rem">Telegram</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
+  var F = null, db = null, me = null, isAdmin = false;
+
+  function timeAgo(ms) {
+    if (!ms) return "";
+    var s = Math.floor((Date.now() - ms) / 1000);
+    if (s < 60) return s + "s ago";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+
+  fb.ensure().then(function () {
+    var r = fb.raw(); F = r.S._fs; db = r.S.sDb;
+    return fb.currentUser();
+  }).then(function (u) {
+    me = u;
+    document.getElementById("composer-on").style.display = u ? "block" : "none";
+    document.getElementById("composer-off").style.display = u ? "none" : "block";
+    if (u) return fb.isAdmin(u.uid).then(function (ok) { isAdmin = ok; });
+  }).then(loadFeed).catch(function () {
+    document.getElementById("feed-loading").style.display = "none";
+    document.getElementById("feed-empty").style.display = "block";
+    document.querySelector("#feed-empty h3").textContent = "Couldn't load posts";
+    document.querySelector("#feed-empty p").textContent = "Check your connection and refresh.";
+  });
+
+  function postCard(p) {
+    var el = document.createElement("article");
+    el.className = "row-card anim-rise";
+    var adminPost = p.authorRole === "admin";
+    var canDel = (me && p.uid === me.uid) || isAdmin;
+    el.innerHTML =
+      '<div class="row-head"><span class="ava' + (adminPost ? " admin" : "") + '">' + ui.esc(String((p.authorName || "U").charAt(0).toUpperCase())) + "</span>" +
+      '<div style="min-width:0"><div style="font-weight:700;font-size:.92rem" class="who"></div><div class="mono muted" style="font-size:.65rem"></div></div>' +
+      (adminPost ? '<span class="chip adm">Admin</span>' : "") +
+      '<span style="margin-left:auto"></span></div>' +
+      '<h3 style="margin:.7rem 0 .3rem;font-size:1.02rem" class="pt"></h3>' +
+      '<div class="muted pb" style="font-size:.9rem;line-height:1.55;white-space:pre-wrap;word-break:break-word"></div>' +
+      '<div class="act-bar">' +
+      '<button class="btn btn-ghost btn-sm" data-a="like">♥ <span>' + (p.likeCount || 0) + "</span></button>" +
+      '<button class="btn btn-ghost btn-sm" data-a="comments">Comments</button>' +
+      '<button class="btn btn-ghost btn-sm" data-a="report">Report</button>' +
+      (canDel ? '<button class="btn btn-ghost btn-sm" data-a="del">Delete</button>' : "") +
+      "</div>" +
+      '<div class="chat-box" data-a="clist" style="display:none;margin-top:.7rem;max-height:16rem"></div>' +
+      '<div style="display:none;gap:.5rem;margin-top:.6rem" data-a="cform"><input class="input" maxlength="500" placeholder="Write a comment…" style="flex:1" /><button class="btn btn-primary btn-sm">Send</button></div>';
+    el.querySelector(".who").textContent = adminPost ? "Admin" : (p.authorName || "User");
+    el.querySelector(".who + div").textContent = timeAgo(p.at);
+    el.querySelector(".pt").textContent = p.title || "";
+    el.querySelector(".pb").textContent = p.body || "";
+    var clist = el.querySelector('[data-a="clist"]'), cform = el.querySelector('[data-a="cform"]');
+    var cinput = cform.querySelector("input");
+
+    el.querySelector('[data-a="like"]').addEventListener("click", function () {
+      if (!me) return ui.toast("Sign in required", "Sign in to like posts");
+      var btn = this; btn.disabled = true;
+      var likeRef = F.doc(db, "posts", p.id, "likes", me.uid);
+      F.getDoc(likeRef).then(function (ls) {
+        if (ls.exists()) {
+          return F.deleteDoc(likeRef).then(function () {
+            p.likeCount = Math.max(0, (p.likeCount || 1) - 1);
+            return F.setDoc(F.doc(db, "posts", p.id), { likeCount: p.likeCount }, { merge: true });
+          }).then(function () { btn.classList.remove("on"); });
+        }
+        return F.setDoc(likeRef, { at: Date.now() }).then(function () {
+          p.likeCount = (p.likeCount || 0) + 1;
+          return F.setDoc(F.doc(db, "posts", p.id), { likeCount: p.likeCount }, { merge: true });
+        }).then(function () { btn.classList.add("on"); });
+      }).then(function () { btn.querySelector("span").textContent = p.likeCount; })
+        .catch(function () { ui.toast("Couldn't like", "Try again"); })
+        .then(function () { btn.disabled = false; });
+    });
+
+    el.querySelector('[data-a="comments"]').addEventListener("click", function () {
+      var open = clist.style.display !== "none";
+      clist.style.display = open ? "none" : "flex";
+      cform.style.display = open ? "none" : "flex";
+      if (!open) loadComments(p.id, clist);
+    });
+
+    cform.querySelector("button").addEventListener("click", function () {
+      var text = (cinput.value || "").trim().slice(0, 500);
+      if (!text) return;
+      if (!me) return ui.toast("Sign in required", "Sign in to comment");
+      var cid = Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      F.setDoc(F.doc(db, "posts", p.id, "comments", cid), {
+        uid: me.uid, name: isAdmin ? "Admin" : String(me.displayName || me.email || "User").slice(0, 40),
+        authorRole: isAdmin ? "admin" : "user", text: text, at: Date.now()
+      }).then(function () { cinput.value = ""; loadComments(p.id, clist); })
+        .catch(function () { ui.toast("Couldn't comment", "Write denied"); });
+    });
+
+    el.querySelector('[data-a="report"]').addEventListener("click", function () {
+      if (!me) return ui.toast("Sign in required", "Sign in to report");
+      var reason = (prompt("Why are you reporting this post? (spam / abuse / wrong info)") || "").trim().slice(0, 200);
+      if (!reason) return;
+      F.setDoc(F.doc(db, "post_reports", p.id + "_" + me.uid), { postId: p.id, reason: reason, by: me.uid, at: Date.now() })
+        .then(function () { ui.toast("Reported", "Admins will review this post"); })
+        .catch(function () { ui.toast("Couldn't report", "Write denied"); });
+    });
+
+    var del = el.querySelector('[data-a="del"]');
+    if (del) del.addEventListener("click", function () {
+      if (!confirm("Delete this post and its comments?")) return;
+      F.getDocs(F.query(F.collection(db, "posts", p.id, "comments"), F.limit(100))).then(function (cs) {
+        return Promise.all(cs.docs.map(function (d) { return F.deleteDoc(d.ref); }));
+      }).catch(function () {}).then(function () {
+        return F.deleteDoc(F.doc(db, "posts", p.id));
+      }).then(function () { el.remove(); ui.toast("Deleted", "Post removed"); })
+        .catch(function () { ui.toast("Couldn't delete", "Delete denied"); });
+    });
+    return el;
+  }
+
+  function loadComments(postId, clist) {
+    clist.innerHTML = '<div class="muted" style="font-size:.75rem">Loading…</div>';
+    F.getDocs(F.query(F.collection(db, "posts", postId, "comments"), F.orderBy("at", "asc"), F.limit(30))).then(function (snap) {
+      clist.innerHTML = "";
+      if (snap.empty) { clist.innerHTML = '<div class="muted" style="font-size:.75rem">No comments yet.</div>'; return; }
+      snap.forEach(function (d) {
+        var c = d.data() || {}, adminC = c.authorRole === "admin";
+        var row = document.createElement("div");
+        row.className = "chat-row";
+        row.innerHTML = '<div class="bubble"><span class="who"></span><span class="ct"></span></div>';
+        var whoEl = row.querySelector(".who");
+        if (adminC) whoEl.textContent = "Admin ·";
+        else whoEl.textContent = (c.name || "User") + " ·";
+        row.querySelector(".ct").textContent = c.text || "";
+        clist.appendChild(row);
+      });
+    }).catch(function () { clist.innerHTML = '<div class="muted" style="font-size:.75rem">Couldn\'t load comments.</div>'; });
+  }
+
+  function loadFeed() {
+    var feed = document.getElementById("feed");
+    F.getDocs(F.query(F.collection(db, "posts"), F.orderBy("at", "desc"), F.limit(20))).then(function (snap) {
+      document.getElementById("feed-loading").style.display = "none";
+      feed.innerHTML = "";
+      if (snap.empty) { document.getElementById("feed-empty").style.display = "block"; return; }
+      var posts = [];
+      snap.forEach(function (d) { posts.push(Object.assign({ id: d.id }, d.data() || {})); });
+      var liked = Promise.resolve(new Set());
+      if (me) {
+        liked = Promise.all(posts.map(function (p) {
+          return F.getDoc(F.doc(db, "posts", p.id, "likes", me.uid)).then(function (l) { return l.exists() ? p.id : null; }).catch(function () { return null; });
+        })).then(function (arr) { return new Set(arr.filter(Boolean)); });
+      }
+      liked.then(function (set) {
+        posts.forEach(function (p, i) {
+          var card = postCard(p);
+          if (set.has(p.id)) card.querySelector('[data-a="like"]').classList.add("on");
+          card.style.setProperty("--d", Math.min(i * 0.04, 0.4) + "s");
+          feed.appendChild(card);
+        });
+        SK.ads.render();
+      });
+    }).catch(function () {
+      document.getElementById("feed-loading").style.display = "none";
+      document.getElementById("feed-empty").style.display = "block";
+      document.querySelector("#feed-empty h3").textContent = "Couldn't load posts";
+      document.querySelector("#feed-empty p").textContent = "Check your connection and refresh.";
+    });
+  }
+
+  document.getElementById("post-send").addEventListener("click", function () {
+    var title = (document.getElementById("post-title").value || "").trim().slice(0, 120);
+    var body = (document.getElementById("post-body").value || "").trim().slice(0, 5000);
+    if (!title || !body) return ui.toast("Missing fields", "Title and post body required");
+    if (!me) return ui.toast("Sign in required", "Sign in to post");
+    var btn = this; btn.disabled = true;
+    var pid = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    F.setDoc(F.doc(db, "posts", pid), {
+      uid: me.uid, authorName: isAdmin ? "Admin" : String(me.displayName || me.email || "User").slice(0, 40),
+      authorRole: isAdmin ? "admin" : "user", title: title, body: body, at: Date.now(), likeCount: 0
+    }).then(function () {
+      document.getElementById("post-title").value = "";
+      document.getElementById("post-body").value = "";
+      ui.toast("Posted", "Your post is live");
+      loadFeed();
+    }).catch(function () { ui.toast("Couldn't post", "Write denied"); })
+      .then(function () { btn.disabled = false; });
+  });
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

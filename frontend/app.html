@@ -74,6 +74,12 @@
     </section>
   </div>
 
+  <section class="panel anim-rise" style="margin-top:1.2rem" aria-label="Releases">
+    <span class="kicker">Releases</span>
+    <div id="rel-latest" class="muted" style="font-size:.9rem;margin-top:.4rem">Checking latest version…</div>
+    <div id="rel-list" style="margin-top:.8rem"></div>
+  </section>
+
   <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 </div></main>
 
@@ -91,7 +97,7 @@
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
-  ui.nav(); ui.telegram(); ui.authArea();
+  ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
   var ref = qp("ref");
   if (ref) { try { localStorage.setItem("sk_pending_ref", ref); } catch (e) {} }
@@ -106,6 +112,57 @@
   });
 
   document.getElementById("wl-count").textContent = "waitlist open — be early 🌱";
+
+  /* Latest version from Firestore `app` collection (admin publishes versions). */
+  fb.appLatest().then(function (v) {
+    var latest = document.getElementById("rel-latest");
+    if (!v || !v.url) { latest.textContent = "No APK published yet — waitlist members get it first."; return; }
+    latest.innerHTML = "";
+    var line = document.createElement("div");
+    line.style.fontWeight = "700";
+    line.style.color = "var(--ink)";
+    line.textContent = (v.name || "StudiKitEZ") + " v" + (v.version || "1.0") + (v.size ? " · " + v.size : "");
+    var notes = document.createElement("div");
+    notes.className = "muted";
+    notes.style.fontSize = ".85rem";
+    notes.style.margin = ".25rem 0 .6rem";
+    notes.textContent = v.notes || "";
+    var dl = document.createElement("a");
+    dl.className = "btn btn-primary btn-sm";
+    dl.href = v.url;
+    dl.textContent = "Download v" + (v.version || "") + " →";
+    latest.appendChild(line); latest.appendChild(notes); latest.appendChild(dl);
+    document.getElementById("apk-btn").href = v.url;
+    document.getElementById("apk-btn").textContent = "Download APK";
+    document.getElementById("copy-link").addEventListener("click", function (e) {
+      e.stopImmediatePropagation();
+      if (navigator.clipboard) navigator.clipboard.writeText(v.url).then(function () { ui.toast("Copied ✓", "Download link ready"); });
+      else prompt("Copy download link:", v.url);
+    }, true);
+  }).catch(function () {});
+  fb.appVersions().then(function (list) {
+    if (!list.length) return;
+    var host = document.getElementById("rel-list");
+    host.innerHTML = "";
+    list.forEach(function (v) {
+      var r = document.createElement("div");
+      r.className = "row-head";
+      r.style.padding = ".45rem 0";
+      r.style.borderTop = "1px solid var(--line)";
+      r.innerHTML = '<span class="chip">v' + ui.esc(v.version || "?") + "</span>" +
+        '<span class="mono muted" style="font-size:.7rem"></span>' +
+        '<span class="mono muted" style="font-size:.7rem"></span>';
+      r.children[1].textContent = "code " + (v.versionCode || "");
+      r.children[2].textContent = v.notes || v.size || "";
+      if (v.url) {
+        var a = document.createElement("a");
+        a.className = "btn btn-ghost btn-sm"; a.href = v.url; a.textContent = "Download";
+        a.style.marginLeft = "auto";
+        r.appendChild(a);
+      }
+      host.appendChild(r);
+    });
+  }).catch(function () {});
   document.getElementById("wl-join").addEventListener("click", async function () {
     var contact = document.getElementById("wl-contact").value.trim();
     var okMail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);

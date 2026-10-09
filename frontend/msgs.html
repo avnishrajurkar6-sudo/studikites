@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Messages — StudiKitEZ</title>
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <div class="page-head anim-rise">
+    <span class="kicker">Inbox · community</span>
+    <h1>Messages</h1>
+    <p>Chat with anyone, join the common community room, and read admin notices.</p>
+  </div>
+
+  <div class="bento">
+    <section class="panel span-4 anim-rise" aria-label="Conversations">
+      <span class="kicker">Find someone</span>
+      <input class="input" id="user-q" placeholder="Search name / email…" maxlength="60" style="font-size:.85rem" />
+      <div id="user-results" style="margin-top:.5rem"></div>
+      <div style="margin-top:1rem">
+        <span class="kicker">Conversations</span>
+        <div id="thread-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
+      </div>
+      <div style="margin-top:1rem">
+        <span class="kicker">Notifications</span>
+        <div id="inbox-list" style="display:flex;flex-direction:column;gap:.4rem;font-size:.82rem"></div>
+      </div>
+    </section>
+
+    <section class="panel span-8 anim-rise" style="--d:.05s;display:flex;flex-direction:column;min-height:26rem" aria-label="Conversation">
+      <div class="row-head" style="margin-bottom:.6rem">
+        <span class="kicker" style="margin:0">Community room</span>
+        <span class="mono muted" style="font-size:.68rem" id="chat-sub">everyone can talk here</span>
+      </div>
+      <div class="chat-box" id="msgs" style="flex:1;max-height:24rem;min-height:14rem" aria-live="polite"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.7rem">
+        <input class="input" id="msg-input" placeholder="Message…" maxlength="1000" aria-label="Message" />
+        <button class="btn btn-primary btn-sm" id="msg-send" aria-label="Send">➤</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="dashboard.html" style="font-size:.85rem">Dashboard</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var user = null, thread = "community", off = null;
+
+  ui.load(true);
+  fb.requireLogin("msgs.html").then(function (u) {
+    user = u;
+    ui.nav(); ui.telegramNag(); ui.authArea();
+    ui.load(false);
+    openThread("community");
+    loadThreads();
+    fb.watchInbox(user.uid, renderInbox);
+  }).catch(function () { ui.load(false); });
+
+  function timeAgo(ms) {
+    if (!ms) return "";
+    var s = Math.floor((Date.now() - ms) / 1000);
+    if (s < 60) return "now";
+    if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    return Math.floor(s / 86400) + "d";
+  }
+
+  function openThread(id, label) {
+    thread = id;
+    var host = document.getElementById("msgs");
+    host.innerHTML = "";
+    document.getElementById("chat-sub").textContent = label || (id === "community" ? "everyone can talk here" : "direct message");
+    if (off) { try { off(); } catch (e) {} off = null; }
+    var spin = document.createElement("div");
+    spin.className = "spinner"; spin.style.margin = "auto";
+    host.appendChild(spin);
+    off = fb.watchThread(id, function (m) {
+      if (!document.body.contains(host)) return;
+      if (!m) { spin.remove(); return; }
+      if (spin.parentNode) spin.remove();
+      var mine = m.from === user.uid;
+      var row = document.createElement("div");
+      row.className = "chat-row" + (mine ? " mine" : "");
+      row.innerHTML = '<div class="bubble">' + (mine ? "" : '<span class="who"></span>') + "<span></span></div>";
+      if (!mine) row.querySelector(".who").textContent = m.name || "learner";
+      row.querySelectorAll("span")[mine ? 0 : 1].textContent = m.text || "";
+      host.appendChild(row);
+      while (host.children.length > 120) host.removeChild(host.firstChild);
+      host.scrollTop = host.scrollHeight;
+    });
+    document.querySelectorAll('[data-thread]').forEach(function (b) {
+      b.classList.toggle("on", b.getAttribute("data-thread") === id);
+    });
+  }
+
+  function send() {
+    var input = document.getElementById("msg-input"), t = input.value.trim();
+    if (!t) return;
+    if (!user) return;
+    fb.sendMsg(thread, t).then(function () {
+      input.value = "";
+    }).catch(function (e) {
+      ui.toast("Couldn't send", e.message === "signin" ? "Sign in required" : "Try again");
+    });
+  }
+  document.getElementById("msg-send").addEventListener("click", send);
+  document.getElementById("msg-input").addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
+
+  function threadButton(id, name, last, at) {
+    var b = document.createElement("button");
+    b.className = "btn btn-secondary btn-sm";
+    b.style.width = "100%";
+    b.style.justifyContent = "space-between";
+    b.setAttribute("data-thread", id);
+    b.innerHTML = '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span><span class="mono muted" style="font-size:.62rem;flex:none"></span>';
+    b.children[0].textContent = (id === "community" ? "🌐 Community" : name || id.slice(0, 16));
+    b.children[1].textContent = timeAgo(at || 0);
+    b.addEventListener("click", function () { openThread(id, id === "community" ? null : (name || "")); });
+    return b;
+  }
+  function loadThreads() {
+    var host = document.getElementById("thread-list");
+    host.innerHTML = '<div class="muted" style="font-size:.75rem">Loading…</div>';
+    fb.myThreads().then(function (list) {
+      host.innerHTML = "";
+      if (!list.length) { host.innerHTML = '<div class="muted" style="font-size:.75rem">No conversations yet — search someone above.</div>'; return; }
+      list.forEach(function (t) {
+        if (t.id === "community") return;
+        var other = (t.id || "").split("__").filter(function (x) { return x && x !== user.uid; })[0] || "";
+        host.appendChild(threadButton(t.id, other.replace(/^phone_/, "+91 "), t.lastText, t.lastAt));
+      });
+    });
+  }
+
+  document.getElementById("user-q").addEventListener("input", function () {
+    var t = this.value;
+    var box = document.getElementById("user-results");
+    if (t.trim().length < 2) { box.innerHTML = ""; return; }
+    fb.searchUsers(t, 6).then(function (rows) {
+      box.innerHTML = rows.length ? "" : '<div class="muted" style="font-size:.75rem">No users found.</div>';
+      rows.forEach(function (r) {
+        if (r.uid === user.uid) return;
+        var b = document.createElement("button");
+        b.className = "btn btn-ghost btn-sm";
+        b.style.width = "100%";
+        b.style.justifyContent = "flex-start";
+        b.textContent = (r.name || r.uid).slice(0, 30);
+        b.addEventListener("click", function () {
+          var id = fb.threadId(user.uid, r.uid);
+          openThread(id, r.name);
+          var host = document.getElementById("thread-list");
+          if (!host.querySelector('[data-thread="' + id + '"]')) host.appendChild(threadButton(id, r.name, "", Date.now()));
+          document.getElementById("user-q").value = "";
+          box.innerHTML = "";
+        });
+        box.appendChild(b);
+      });
+    }).catch(function () {});
+  });
+
+  function renderInbox(rows) {
+    var host = document.getElementById("inbox-list");
+    if (!rows) { host.innerHTML = '<div class="muted">Unavailable.</div>'; return; }
+    var mine = rows.filter(function (m) { return m.kind === "general" && m.from !== user.uid; });
+    host.innerHTML = mine.length ? "" : '<div class="muted" style="font-size:.75rem">No notifications.</div>';
+    mine.forEach(function (m) {
+      var el = document.createElement("div");
+      el.className = "row-card";
+      el.style.padding = ".55rem .7rem";
+      el.innerHTML = '<div style="font-weight:700;font-size:.8rem"></div><div class="muted" style="font-size:.78rem;white-space:pre-wrap"></div><div class="mono muted" style="font-size:.62rem"></div>';
+      el.querySelector("div").textContent = m.fromName || "Admin";
+      el.querySelectorAll("div")[1].textContent = m.text || "";
+      el.querySelectorAll("div")[2].textContent = timeAgo(m.at) + (m.read ? "" : " · new");
+      host.appendChild(el);
+      if (!m.read) {
+        fb.ensure().then(function () {
+          var r = fb.raw();
+          r.S._fs.setDoc(r.S._fs.doc(r.S.sDb, "users", user.uid, "inbox", m.id), { read: true }, { merge: true });
+        }).catch(function () {});
+      }
+    });
+  }
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

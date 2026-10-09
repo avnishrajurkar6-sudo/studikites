@@ -102,7 +102,7 @@
   var courseId = qp("id") || "";
   var pathIds = (qp("path") || "").split("/").filter(Boolean);
   var items = [], titles = new Map(), liveTab = "1", user = null, info = { title: "Course " + courseId, thumbnail: "" };
-  ui.nav(); ui.telegram();
+  ui.nav(); ui.telegram(); ui.telegramNag();
 
   try { titles = new Map(JSON.parse(sessionStorage.getItem("sk_titles_" + courseId) || "[]")); } catch (e) {}
   function saveTitles() { try { sessionStorage.setItem("sk_titles_" + courseId, JSON.stringify(Array.from(titles.entries()).slice(-60))); } catch (e) {} }
@@ -113,6 +113,7 @@
     var hit = all.find(function (b) { return String(b.id) === String(courseId); });
     if (hit) info = hit;
     document.title = "StudiKitEZ — " + info.title;
+    SK.fb.presenceBeat(undefined, "browsing · " + info.title);
     document.getElementById("course-title").textContent = info.title;
     if (info.thumbnail) {
       var im = document.getElementById("banner-img");

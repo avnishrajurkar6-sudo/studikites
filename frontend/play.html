@@ -99,7 +99,7 @@
   var courseId = qp("course") || "", contentId = qp("content") || "", folderId = qp("folder") || "0";
   var user = null, play = null, hls = null;
   var video = document.getElementById("video");
-  ui.nav(); ui.telegram();
+  ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
     location.href = "content.html?id=" + courseId + (folderId && folderId !== "0" ? "&path=" + folderId : "");
   });
@@ -137,6 +137,7 @@
     if (play.file_type === 1) { location.replace("pdf.html?course=" + courseId + "&content=" + contentId); return; }
     document.getElementById("doc-title").textContent = play.title || "Lecture";
     document.title = "StudiKitEZ — " + (play.title || "Lecture");
+    SK.fb.presenceBeat(undefined, "watching · " + (play.title || "lecture"));
     attach(play.file_url);
     loadUpNext(); loadNotes(); loadChat(); setInterval(loadChat, 8000);
     SK.ads.render();

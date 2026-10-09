@@ -27,16 +27,114 @@ window.SK.ui = (function () {
         a.addEventListener("click", function () { menu.classList.remove("open"); });
       });
     }
+    injectLinks();
     gateNav();
+    try { window.SK.fb.presenceBeat(); } catch (e) {}
+    watchForce();
   }
-  /* Guests never see Dashboard / Focus Rooms links anywhere. */
+  /* Inject Posts (everyone) + Messages (signed-in) + Admin (admins) into both navs. */
+  function injectLinks() {
+    [".nav-links", "#mobile-menu"].forEach(function (sel) {
+      var host = document.querySelector(sel);
+      if (!host || host.querySelector('a[href="posts.html"]')) return;
+      var anchor = host.querySelector('a[href="index.html"]');
+      var posts = document.createElement("a");
+      posts.href = "posts.html"; posts.textContent = "Posts";
+      var msgs = document.createElement("a");
+      msgs.href = "msgs.html"; msgs.textContent = "Messages";
+      if (anchor) { host.insertBefore(posts, anchor.nextSibling); host.insertBefore(msgs, posts.nextSibling); }
+      else { host.appendChild(posts); host.appendChild(msgs); }
+    });
+    window.SK.fb.currentUser().then(function (u) {
+      if (!u) return;
+      return window.SK.fb.isAdmin(u.uid).then(function (ok) {
+        if (!ok) return;
+        document.querySelectorAll(".nav-links, #mobile-menu").forEach(function (host) {
+          if (host.querySelector('a[href="admin.html"]')) return;
+          var a = document.createElement("a");
+          a.href = "admin.html"; a.textContent = "Admin";
+          host.appendChild(a);
+        });
+      });
+    }).catch(function () {});
+  }
+  /* Guests never see Dashboard / Focus / Messages links anywhere. */
   function gateNav() {
     window.SK.fb.currentUser().then(function (u) {
       if (u) return;
-      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"]').forEach(function (a) {
+      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"], a[href="msgs.html"]').forEach(function (a) {
         a.style.display = "none";
       });
     }).catch(function () {});
+  }
+  /* Force-message relay: if an admin has an active force msg for this user,
+     every page bounces them to forcemsg.html until released. */
+  function watchForce() {
+    window.SK.fb.currentUser().then(function (u) {
+      if (!u) return;
+      if (location.pathname.indexOf("forcemsg.html") >= 0) return;
+      window.SK.fb.watchForce(u.uid, function (f) {
+        if (window.SK.fb.forceActive(f)) location.href = "forcemsg.html";
+      });
+    }).catch(function () {});
+  }
+  /* Announcement popup — newest active announcement, once per id. */
+  async function announcePopup() {
+    try {
+      var list = await window.SK.fb.announcements(1);
+      if (!list.length) return;
+      var a = list[0], key = "sk_ann_" + a.id, seen = null;
+      try { seen = localStorage.getItem(key); } catch (e) {}
+      if (seen) return;
+      var m = modal(
+        '<span class="kicker">Announcement</span><h3 style="margin:.5rem 0 .35rem">' + esc(a.title) + "</h3>" +
+        '<p class="muted" style="margin:0;font-size:.95rem;line-height:1.55"></p>' +
+        '<div style="display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap">' +
+        (a.link ? '<a class="btn btn-primary btn-sm" id="ann-go">Open →</a>' : "") +
+        '<button class="btn btn-ghost btn-sm" id="ann-x">Got it</button></div>');
+      m.querySelector("p").textContent = a.body || "";
+      try { localStorage.setItem(key, "1"); } catch (e) {}
+      if (a.link) m.querySelector("#ann-go").addEventListener("click", function () { location.href = a.link; });
+      m.querySelector("#ann-x").addEventListener("click", closeModal);
+    } catch (e) {}
+  }
+  /* Telegram nag — asks to join on every page view (dismiss lasts this visit). */
+  function telegramNag() {
+    if (document.querySelector(".modal-card")) { setTimeout(telegramNag, 6000); return; }
+    var dismissed = false;
+    try { dismissed = sessionStorage.getItem("sk_tg_nag") === "1"; } catch (e) {}
+    if (dismissed) return;
+    setTimeout(function () {
+      if (document.querySelector(".modal-card")) { setTimeout(telegramNag, 6000); return; }
+      var url = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/studikitez";
+      var m = modal(
+        '<span class="kicker">Stay updated</span><h3 style="margin:.5rem 0 .35rem">Join our Telegram</h3>' +
+        '<p class="muted" style="margin:0;font-size:.95rem;line-height:1.55">New batches, live classes and exam alerts — pushed instantly to the channel.</p>' +
+        '<div style="display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap">' +
+        '<a class="btn btn-primary btn-sm" id="tg-join" target="_blank" rel="noopener">Join channel →</a>' +
+        '<button class="btn btn-ghost btn-sm" id="tg-x">Not now</button></div>');
+      m.querySelector("#tg-join").href = url;
+      m.querySelector("#tg-x").addEventListener("click", function () {
+        try { sessionStorage.setItem("sk_tg_nag", "1"); } catch (e) {}
+        closeModal();
+      });
+    }, 7000);
+  }
+  var modalHost = null;
+  function modal(html) {
+    closeModal();
+    modalHost = document.createElement("div");
+    modalHost.className = "modal anim-rise";
+    modalHost.setAttribute("role", "dialog");
+    modalHost.setAttribute("aria-modal", "true");
+    modalHost.innerHTML = '<div class="modal-card panel">' + html + "</div>";
+    modalHost.addEventListener("click", function (e) { if (e.target === modalHost) closeModal(); });
+    document.body.appendChild(modalHost);
+    return modalHost;
+  }
+  function closeModal() {
+    if (modalHost && modalHost.parentNode) modalHost.remove();
+    modalHost = null;
   }
   /* Shared page boot: loader on, login check, ban check, ad-free check.
      strict=false redirects guests to login; strict pages pass allowGuest. */
@@ -130,5 +228,5 @@ window.SK.ui = (function () {
     }
     requestAnimationFrame(step);
   }
-  return { esc: esc, toast: toast, nav: nav, gateNav: gateNav, gatePage: gatePage, telegram: telegram, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
+  return { esc: esc, toast: toast, nav: nav, gateNav: gateNav, gatePage: gatePage, telegram: telegram, telegramNag: telegramNag, announcePopup: announcePopup, modal: modal, closeModal: closeModal, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
 })();

@@ -84,7 +84,7 @@
         <input class="input" id="room-input" placeholder="Message the room…" maxlength="300" aria-label="Room message" />
         <button class="btn btn-primary btn-sm" id="room-send" aria-label="Send message">➤</button>
       </div>
-      <p class="mono muted" id="room-chat-note" style="font-size:.65rem;display:none;margin:.5rem 0 0">chat unavailable — Realtime Database not enabled yet</p>
+      <p class="mono muted" id="room-chat-note" style="font-size:.65rem;display:none;margin:.5rem 0 0">chat unavailable — check connection</p>
     </section>
 
     <section class="panel span-7 anim-rise" style="--d:.1s" aria-label="All rooms">
@@ -109,7 +109,7 @@
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
-  ui.nav(); ui.telegram();
+  ui.nav(); ui.telegram(); ui.telegramNag();
   var user = null;
   ui.load(true);
   fb.requireLogin("focus.html").then(function (u) {
@@ -189,7 +189,7 @@
           renderDots();
           ui.toast("Focus block done ✓", focusMin + " min logged — take " + breakMin + " off");
           stats();
-        } else ui.toast("Break over", "Back to focus 🌿");
+        } else { ui.toast("Break over", "Back to focus 🌿"); stats(); }
         onBreak = !onBreak;
         remaining = (onBreak ? breakMin : focusMin) * 60;
       }
@@ -200,10 +200,15 @@
   async function stats() {
     if (!user) return;
     try {
-      var d = await fb.userDoc(user.uid);
-      void d;
-    } catch (e) {}
-    document.getElementById("t-stats").textContent = "sessions save to your study log";
+      var g = await fb.gamification(user.uid);
+      var st = g.streak || {};
+      var today = 0;
+      try { today = parseInt(localStorage.getItem("sk_focus_done_" + fb.dayKey()) || "0", 10) || 0; } catch (e) {}
+      document.getElementById("t-stats").textContent =
+        "🔥 " + (st.current || 0) + " day streak · best " + (st.best || 0) + " · " + today + " blocks today · " + (g.xp || 0) + " xp";
+    } catch (e) {
+      document.getElementById("t-stats").textContent = "sessions save to your study log";
+    }
   }
   paint();
 

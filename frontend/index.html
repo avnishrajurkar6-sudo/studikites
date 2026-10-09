@@ -47,6 +47,11 @@
     <input id="q" type="search" placeholder="Search batches…" autocomplete="off" aria-label="Search batches" />
   </div>
 
+  <section id="announcements" style="margin-top:1.4rem;display:none" aria-label="Announcements">
+    <span class="kicker">Announcements</span>
+    <div class="ann-strip" id="ann-list"></div>
+  </section>
+
   <div class="cards" id="grid" style="margin-top:1.25rem" aria-live="polite"></div>
 
   <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
@@ -66,7 +71,27 @@
 <script>
 (function () {
   var ui = SK.ui, grid = document.getElementById("grid"), q = document.getElementById("q"), all = [];
-  ui.nav(); ui.telegram(); ui.authArea();
+  ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
+  ui.announcePopup();
+  SK.fb.announcements(4).then(function (list) {
+    if (!list.length) return;
+    var host = document.getElementById("ann-list");
+    document.getElementById("announcements").style.display = "";
+    list.forEach(function (a) {
+      var el = document.createElement("div");
+      el.className = "ann-item anim-rise";
+      el.innerHTML = '<span class="ico" aria-hidden="true">📢</span><div style="flex:1;min-width:0"><div style="font-weight:700"></div><div class="muted" style="font-size:.88rem;line-height:1.5;white-space:pre-wrap"></div></div>';
+      el.querySelector("div div").textContent = a.title;
+      el.querySelectorAll("div div")[1].textContent = a.body || "";
+      if (a.link) {
+        var b = document.createElement("a");
+        b.className = "btn btn-secondary btn-sm"; b.style.marginTop = ".6rem"; b.textContent = "Open →";
+        b.href = a.link;
+        el.querySelector("div").appendChild(b);
+      }
+      host.appendChild(el);
+    });
+  }).catch(function () {});
   function enrolled() { try { return JSON.parse(localStorage.getItem("sk_enrolled") || "[]"); } catch (e) { return []; } }
   function render(filter) {
     grid.innerHTML = "";
