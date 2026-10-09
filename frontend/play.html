@@ -106,7 +106,9 @@
   function fmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
 
   fb.currentUser().then(function (u) { user = u; }).catch(function () {});
-  fb.ensure().then(bootWithKey).catch(function () {
+  ui.load(true);
+  fb.ensure().then(bootWithKey).then(function () { ui.load(false); }).catch(function () {
+    ui.load(false);
     document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Backend unreachable</h2><p class="muted">Set the backend URL and check connection, then retry.</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
   });
   async function bootWithKey() {

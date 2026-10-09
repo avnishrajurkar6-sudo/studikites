@@ -61,8 +61,7 @@ window.SK.ui = (function () {
       host.appendChild(s);
     }
   }
-  function skeleton(host, rows) {
-    if (!host) return;
+  function skeleton(host, rows) {    if (!host) return;
     host.innerHTML = "";
     for (var i = 0; i < (rows || 6); i++) {
       var d = document.createElement("div");
@@ -71,5 +70,33 @@ window.SK.ui = (function () {
       host.appendChild(d);
     }
   }
-  return { esc: esc, toast: toast, nav: nav, telegram: telegram, authArea: authArea, skeleton: skeleton };
+  var loadCount = 0;
+  function load(on) {
+    var bar = document.getElementById("top-loader");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "top-loader";
+      bar.setAttribute("aria-hidden", "true");
+      document.body.prepend(bar);
+    }
+    loadCount = Math.max(0, loadCount + (on ? 1 : -1));
+    bar.classList.toggle("on", loadCount > 0);
+  }
+  function countUp(el, target, dur) {
+    if (!el) return;
+    target = Math.max(0, Math.round(Number(target) || 0));
+    try {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = target; return; }
+    } catch (e) {}
+    var start = null, D = dur || 800;
+    function step(ts) {
+      if (!document.body.contains(el)) return;
+      if (!start) start = ts;
+      var p = Math.min(1, (ts - start) / D), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * e);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  return { esc: esc, toast: toast, nav: nav, telegram: telegram, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
 })();

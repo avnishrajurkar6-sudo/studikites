@@ -117,6 +117,7 @@
     }
   }
 
+  ui.load(true);
   fb.requireLogin("dashboard.html").then(function (user) {
     ui.authArea();
     document.getElementById("greet").textContent = "Namaste, " + (user.displayName && user.displayName.indexOf("+91") !== 0 ? user.displayName.split(" ")[0] : "learner") + " 👋";
@@ -125,7 +126,8 @@
     activeBatch(user); streakBox(user); planBox(user); refBox(user);
     focusBox(); feedBox(); annBox();
     SK.ads.render();
-  }).catch(function () {});
+    ui.load(false);
+  }).catch(function () { ui.load(false); });
 
   async function activeBatch(user) {
     var host = document.getElementById("active-body");
@@ -156,7 +158,7 @@
   async function streakBox(user) {
     try {
       var d = await fb.userDoc(user.uid), g = (d && d.gamification) || {}, st = g.streak || {};
-      document.getElementById("streak-n").textContent = st.current || 0;
+      ui.countUp(document.getElementById("streak-n"), st.current || 0);
       document.getElementById("streak-best").textContent = "best " + (st.best || 0);
       document.getElementById("xp-line").textContent = "xp " + (g.xp || 0);
     } catch (e) {}
@@ -171,7 +173,7 @@
   async function refBox(user) {
     try {
       var r = await fb.myReferrals();
-      document.getElementById("ref-n").textContent = r.count;
+      ui.countUp(document.getElementById("ref-n"), r.count);
       document.getElementById("ref-sub").textContent = r.freeDaysLeft + " ad-free day(s) banked · +1 per signup";
     } catch (e) { document.getElementById("ref-n").textContent = "—"; }
     document.getElementById("copy-ref").addEventListener("click", function () {

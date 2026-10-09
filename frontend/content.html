@@ -340,12 +340,15 @@
   }
 
   ui.skeleton(document.getElementById("grid"), 6);
+  ui.load(true);
   crumbs();
   api.content(courseId, pathIds.length ? pathIds[pathIds.length - 1] : "0").then(function (data) {
     items = data;
     data.forEach(function (it) { titles.set(String(it.entity_id), it.title); });
     saveTitles(); crumbs(); renderGrid();
+    ui.load(false);
   }).catch(function (e) {
+    ui.load(false);
     document.getElementById("grid").innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Couldn\'t reach the server</h3><p>' + ui.esc(e.message || e) + '</p><button class="btn btn-primary btn-sm" id="retry" style="margin-top:.75rem">Retry</button></div>';
     document.getElementById("retry").addEventListener("click", function () { location.reload(); });
   });

@@ -275,6 +275,37 @@ window.SK.fb = (function () {
       return out;
     } catch (e) { return []; }
   }
+  /* realtime room chat (Firebase Realtime Database, studiki project) */
+  var rtdbDb = null, rtdbMod = null;
+  async function rtdb() {
+    if (rtdbDb) return { db: rtdbDb, mod: rtdbMod };
+    var cfg = await window.SK.api.getConfig();
+    var url = cfg.STUDIKI && cfg.STUDIKI.databaseURL;
+    if (!url) throw new Error("Realtime Database is not enabled");
+    var appMod = await import(V + "firebase-app.js");
+    rtdbMod = await import(V + "firebase-database.js");
+    var full = Object.assign({}, cfg.STUDIKI, { databaseURL: url });
+    var app = appMod.getApps().find(function (a) { return a.name === "studiki-rtdb"; }) || appMod.initializeApp(full, "studiki-rtdb");
+    rtdbDb = rtdbMod.getDatabase(app);
+    return { db: rtdbDb, mod: rtdbMod };
+  }
+  async function sendRoomChat(roomId, text) {
+    var me = await currentUser(); if (!me) throw new Error("signin");
+    var r = await rtdb();
+    await r.mod.push(r.mod.ref(r.db, "rooms/" + roomId + "/chat"), {
+      uid: me.uid, name: (me.displayName || "learner").slice(0, 40),
+      text: String(text).slice(0, 300), at: Date.now(),
+    });
+  }
+  function watchRoomChat(roomId, cb) {
+    var off = null, dead = false;
+    rtdb().then(function (r) {
+      if (dead) return;
+      var q = r.mod.query(r.mod.ref(r.db, "rooms/" + roomId + "/chat"), r.mod.limitToLast(40));
+      off = r.mod.onChildAdded(q, function (snap) { cb(snap.val()); });
+    }).catch(function () { if (!dead) cb(null); });
+    return function () { dead = true; try { if (off) off(); } catch (e) {} };
+  }
   async function studyLog(mins) {
     try {
       var me = await currentUser(); if (!me) return;
@@ -345,5 +376,5 @@ window.SK.fb = (function () {
     return ids;
   }
 
-  return { ensure: ensure, currentUser: currentUser, userDoc: userDoc, requireLogin: requireLogin, signOut: signOut, banCheck: banCheck, phoneSession: phoneSession, idToken: idToken, authHeaders: authHeaders, syncPhone: syncPhone, syncGoogle: syncGoogle, saveProfile: saveProfile, checkPhone: checkPhone, mintKey: mintKey, progress: progress, saveProgress: saveProgress, gamification: gamification, activity: activity, dayKey: dayKey, captureReferral: captureReferral, consumeReferral: consumeReferral, claimRewards: claimRewards, myReferrals: myReferrals, focusJoin: focusJoin, focusRoster: focusRoster, focusRooms: focusRooms, studyLog: studyLog, saveNote: saveNote, listNotes: listNotes, sendChat: sendChat, listChat: listChat, announcements: announcements, postsRecent: postsRecent, enrolled: enrolled, toggleEnroll: toggleEnroll };
+  return { ensure: ensure, currentUser: currentUser, userDoc: userDoc, requireLogin: requireLogin, signOut: signOut, banCheck: banCheck, phoneSession: phoneSession, idToken: idToken, authHeaders: authHeaders, syncPhone: syncPhone, syncGoogle: syncGoogle, saveProfile: saveProfile, checkPhone: checkPhone, mintKey: mintKey, progress: progress, saveProgress: saveProgress, gamification: gamification, activity: activity, dayKey: dayKey, captureReferral: captureReferral, consumeReferral: consumeReferral, claimRewards: claimRewards, myReferrals: myReferrals, focusJoin: focusJoin, focusRoster: focusRoster, focusRooms: focusRooms, sendRoomChat: sendRoomChat, watchRoomChat: watchRoomChat, studyLog: studyLog, saveNote: saveNote, listNotes: listNotes, sendChat: sendChat, listChat: listChat, announcements: announcements, postsRecent: postsRecent, enrolled: enrolled, toggleEnroll: toggleEnroll };
 })();

@@ -36,13 +36,13 @@
 </header>
 
 <main class="page" id="main"><div class="wrap">
-  <div class="page-head">
+  <div class="page-head anim-rise">
     <span class="kicker">Catalog · <span id="count">—</span> batches</span>
     <h1>Find your batch</h1>
     <p>Every batch opens with a free first lecture. Sign in to unlock the rest.</p>
   </div>
 
-  <div class="search" role="search">
+  <div class="search anim-rise" style="--d:.06s" role="search">
     <span aria-hidden="true">⌕</span>
     <input id="q" type="search" placeholder="Search batches…" autocomplete="off" aria-label="Search batches" />
   </div>
@@ -106,13 +106,16 @@
     });
   }
   ui.skeleton(grid, 6);
+  ui.load(true);
   SK.api.allBatches().then(function (batches) {
     var seen = [];
     try { seen = JSON.parse(localStorage.getItem("sk_seen_batches") || "[]"); } catch (e) {}
     all = batches.map(function (b) { return { id: b.id, title: b.title, thumbnail: b.thumbnail, fresh: seen.indexOf(b.id) < 0 }; });
     try { localStorage.setItem("sk_seen_batches", JSON.stringify(batches.map(function (b) { return b.id; }))); } catch (e) {}
     render("");
+    ui.load(false);
   }).catch(function () {
+    ui.load(false);
     grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Catalog unavailable</h3><p>Check your connection and retry.</p></div>';
   });
   q.addEventListener("input", function () { render(q.value); });
