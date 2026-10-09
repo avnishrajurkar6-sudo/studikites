@@ -22,7 +22,7 @@ const DEFAULTS = {
     appId: "1:730581787323:web:934a0c33400c0b8c14bf9e",
     measurementId: "G-X0ZH9VYZ9B",
   },
-  SITE_URL: "https://studikites.vercel.app",
+    SITE_URL: "https://studikitesz.pages.dev",
   TELEGRAM_URL: "https://t.me/studikitez",
 };
 
