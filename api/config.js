@@ -53,14 +53,14 @@ module.exports = async function handler(req, res) {
       },
       SITE_URL: pick(e.SITE_URL, DEFAULTS.SITE_URL),
       TELEGRAM_URL: pick(e.TELEGRAM_URL, DEFAULTS.TELEGRAM_URL),
-      ADSENSE_CLIENT: e.ADSENSE_CLIENT || "",
+      ADSENSE_CLIENT: pick(e.ADSENSE_CLIENT, "ca-pub-7694333485336687"),
       ADSENSE_SLOTS: {
-        banner: e.ADSENSE_SLOT_BANNER || "",
-        feed: e.ADSENSE_SLOT_FEED || "",
-        inarticle: e.ADSENSE_SLOT_INARTICLE || "",
-        multiplex: e.ADSENSE_SLOT_MULTIPLEX || "",
+        banner: pick(e.ADSENSE_SLOT_BANNER, "1840322518"),
+        feed: pick(e.ADSENSE_SLOT_FEED, "3696329666"),
+        inarticle: pick(e.ADSENSE_SLOT_INARTICLE, "6026979535"),
+        multiplex: pick(e.ADSENSE_SLOT_MULTIPLEX, "7502133723"),
       },
-      ADSENSE_FEED_KEY: e.ADSENSE_FEED_KEY || "",
+      ADSENSE_FEED_KEY: pick(e.ADSENSE_FEED_KEY, "-fb+5w+4e-db+86"),
     };
     return sendJson(req, res, 200, config);
   } catch (err) {
