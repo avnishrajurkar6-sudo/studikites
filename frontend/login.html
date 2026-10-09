@@ -90,11 +90,10 @@
 
   function alert(msg, ok) {
     var box = document.getElementById("authAlert");
-    box.style.display = "";
-    box.style.background = ok ? "var(--primary-soft)" : "var(--danger-soft)";
+    box.style.display = "";    box.style.background = ok ? "var(--primary-soft)" : "var(--danger-soft)";
     box.style.borderColor = ok ? "var(--primary)" : "var(--danger)";
-    box.style.color = ok ? "var(--primary-dark)" : "var(--danger)";
-    box.textContent = msg;
+  box.style.color = ok ? "var(--primary-dark)" : "var(--danger)";
+  box.textContent = String((msg && msg.message) || msg || "Something went wrong");
   }
   function hideAlert() { document.getElementById("authAlert").style.display = "none"; }
   function setBusy(btn, on, label) {

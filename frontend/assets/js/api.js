@@ -28,7 +28,9 @@ window.SK.api = (function () {
       var json = null;
       try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
       if (!res.ok || !json) {
-        throw new Error((json && (json.error || json.message || json.reason)) || ("HTTP " + res.status));
+        let msg = (json && (json.error || json.message || json.reason)) || ("HTTP " + res.status);
+        if (msg && typeof msg === "object") msg = msg.message || ("HTTP " + res.status);
+        throw new Error(msg);
       }
       return json;
     } catch (e) {

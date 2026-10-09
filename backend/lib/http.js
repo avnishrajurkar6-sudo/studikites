@@ -54,12 +54,16 @@ function readJsonBody(req, limit = 32 * 1024) {
     }
     if (typeof req.body === "object" && req.body !== null) return Promise.resolve(req.body);
   }
+  // Stream already consumed upstream (some runtimes pre-read it): don't hang.
+  if (req.readableEnded || req.complete) return Promise.resolve({});
   return new Promise((resolve, reject) => {
+    const cap = setTimeout(() => reject(Object.assign(new Error("Body read timed out"), { status: 408 })), 5000);
     let size = 0;
     let raw = "";
     req.on("data", (chunk) => {
       size += chunk.length;
       if (size > limit) {
+        clearTimeout(cap);
         reject(Object.assign(new Error("Body too large"), { status: 413 }));
         req.destroy();
         return;
@@ -67,6 +71,7 @@ function readJsonBody(req, limit = 32 * 1024) {
       raw += chunk;
     });
     req.on("end", () => {
+      clearTimeout(cap);
       if (!raw) return resolve({});
       try {
         resolve(JSON.parse(raw));
@@ -74,7 +79,10 @@ function readJsonBody(req, limit = 32 * 1024) {
         reject(Object.assign(new Error("Invalid JSON body"), { status: 400 }));
       }
     });
-    req.on("error", () => reject(Object.assign(new Error(" unreadable body"), { status: 400 })));
+    req.on("error", () => {
+      clearTimeout(cap);
+      reject(Object.assign(new Error("Unreadable body"), { status: 400 }));
+    });
   });
 }
 
@@ -104,8 +112,9 @@ function mediaRoutes() {
 }
 
 function timeoutMs() {
-  const n = Number(process.env.UPSTREAM_TIMEOUT_MS || 20000);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 25000) : 20000;
+  // Keep under serverless execution caps so WE answer (JSON), never the platform.
+  const n = Number(process.env.UPSTREAM_TIMEOUT_MS || 8000);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 25000) : 8000;
 }
 
 /* Public worker URLs with safe defaults so the API works with zero env setup. */
