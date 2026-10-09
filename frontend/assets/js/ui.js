@@ -1,0 +1,75 @@
+/* Shared UI: toasts, nav, auth area, telegram widget. No popups, no tracking. */
+window.SK = window.SK || {};
+window.SK.ui = (function () {
+  function esc(s) {
+    return String(s === null || s === undefined ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function toast(title, msg) {
+    var root = document.getElementById("toast-root");
+    if (!root) return;
+    var el = document.createElement("div");
+    el.className = "toast"; el.setAttribute("role", "status");
+    el.innerHTML = "<b></b><p></p>";
+    el.querySelector("b").textContent = title;
+    el.querySelector("p").textContent = msg || "";
+    root.appendChild(el);
+    setTimeout(function () { el.remove(); }, 3600);
+  }
+  function nav() {
+    var btn = document.getElementById("menu-btn"), menu = document.getElementById("mobile-menu");
+    if (!btn || !menu) return;
+    btn.addEventListener("click", function () {
+      var open = menu.classList.toggle("open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    menu.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function () { menu.classList.remove("open"); });
+    });
+  }
+  function telegram() {
+    if (document.getElementById("tg-widget")) return;
+    var w = document.createElement("div");
+    w.className = "tg-widget"; w.id = "tg-widget";
+    w.innerHTML = '<span>Study updates on <a href="https://t.me/studikitez" target="_blank" rel="noopener">Telegram</a></span><button aria-label="Dismiss">×</button>';
+    w.querySelector("a").href = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/studikitez";
+    w.querySelector("button").addEventListener("click", function () { w.remove(); });
+    document.body.appendChild(w);
+  }
+  async function authArea() {
+    var host = document.getElementById("auth-area");
+    if (!host) return;
+    var u = null;
+    try { u = await window.SK.fb.currentUser(); } catch (e) { u = null; }
+    host.innerHTML = "";
+    if (u) {
+      var a = document.createElement("a");
+      a.className = "btn btn-secondary btn-sm"; a.href = "dashboard.html";
+      a.textContent = u.displayName || u.email || "Dashboard";
+      host.appendChild(a);
+      var out = document.createElement("button");
+      out.className = "btn btn-ghost btn-sm"; out.textContent = "Sign out";
+      out.addEventListener("click", function () {
+        window.SK.fb.signOut().then(function () { location.href = "index.html"; });
+      });
+      host.appendChild(out);
+    } else {
+      var s = document.createElement("a");
+      s.className = "btn btn-primary btn-sm";
+      s.href = "login.html?next=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
+      s.textContent = "Sign in";
+      host.appendChild(s);
+    }
+  }
+  function skeleton(host, rows) {
+    if (!host) return;
+    host.innerHTML = "";
+    for (var i = 0; i < (rows || 6); i++) {
+      var d = document.createElement("div");
+      d.className = "bcard";
+      d.innerHTML = '<div class="thumb skel" style="min-height:120px"></div><div class="body"><div class="skel"></div><div class="skel" style="width:60%"></div></div>';
+      host.appendChild(d);
+    }
+  }
+  return { esc: esc, toast: toast, nav: nav, telegram: telegram, authArea: authArea, skeleton: skeleton };
+})();

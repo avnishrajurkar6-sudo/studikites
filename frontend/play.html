@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lecture — StudiKitEZ</title>
+<meta name="description" content="Watch the lecture distraction-free." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+  .player-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; align-items: start; }
+  @media (min-width: 960px) { .player-grid { grid-template-columns: 2fr 1fr; } }
+  .note-row { border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.75rem; margin-top: 0.5rem; background: var(--surface); }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary"><a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a><a href="focus.html">Focus Rooms</a></nav>
+    <button class="btn btn-ghost btn-sm" id="back-btn">← Course</button>
+  </div>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <span class="kicker">Lecture</span>
+  <h1 id="doc-title" style="font-size:clamp(1.2rem,3vw,1.6rem)">Loading…</h1>
+
+  <div class="player-grid" style="margin-top:1rem">
+    <div>
+      <div class="stage" id="stage">
+        <video id="video" playsinline preload="metadata" style="display:none"></video>
+        <div class="spin-veil" id="veil"><div class="spinner" role="status" aria-label="Loading video"></div></div>
+      </div>
+      <div class="ctl">
+        <div class="seek" id="seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+          <div class="track"><div class="buf" id="buf"></div><div class="fill" id="seekfill"></div><div class="knob" id="knob"></div></div>
+        </div>
+        <button class="iconbtn" id="play-btn" aria-label="Play or pause">▶</button>
+        <button class="iconbtn" id="mute-btn" aria-label="Mute or unmute">♪</button>
+        <input type="range" class="vol" id="vol" min="0" max="100" value="100" aria-label="Volume" />
+        <span class="mono muted" style="font-size:.75rem"><span id="t-cur">0:00</span> / <span id="t-dur">0:00</span></span>
+        <span style="flex:1"></span>
+        <button class="iconbtn" id="pip-btn" aria-label="Picture in picture" title="Picture-in-picture">⧉</button>
+        <button class="iconbtn" id="speed-btn" aria-label="Playback speed" title="Speed">1×</button>
+        <button class="iconbtn" id="fs-btn" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+        <button class="btn btn-secondary btn-sm" id="dl-btn">Download</button>
+      </div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.7rem;align-items:center">
+        <span class="mono muted" style="font-size:.68rem">QUALITY</span>
+        <span id="quals" style="display:flex;gap:.4rem;flex-wrap:wrap"></span>
+      </div>
+
+      <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+
+      <section class="panel" style="margin-top:1rem">
+        <h2 style="font-size:1rem">My notes</h2>
+        <p class="sub">Timestamped, synced to your account.</p>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem">
+          <input class="input" id="note-input" placeholder="Note for this moment…" maxlength="500" aria-label="Add a note" />
+          <button class="btn btn-secondary" id="note-save">Save</button>
+        </div>
+        <div id="notes-list"></div>
+      </section>
+    </div>
+
+    <aside style="display:flex;flex-direction:column;gap:1rem">
+      <section class="panel" style="margin-top:0">
+        <h2 style="font-size:1rem">Up next</h2>
+        <div id="upnext"><span class="muted">Loading…</span></div>
+      </section>
+      <section class="panel" style="margin-top:0">
+        <h2 style="font-size:1rem">Lecture chat <span class="mono muted" style="font-size:.65rem">· 12h</span></h2>
+        <div id="chat-msgs" style="max-height:16rem;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem" aria-live="polite"></div>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem">
+          <input class="input" id="chat-input" placeholder="Say something…" maxlength="300" aria-label="Chat message" />
+          <button class="btn btn-primary btn-sm" id="chat-send" aria-label="Send">➤</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div></main>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, api = SK.api, fb = SK.fb;
+  var qp = function (k) { return new URLSearchParams(location.search).get(k); };
+  var courseId = qp("course") || "", contentId = qp("content") || "", folderId = qp("folder") || "0";
+  var user = null, play = null, hls = null;
+  var video = document.getElementById("video");
+  ui.nav(); ui.telegram();
+  document.getElementById("back-btn").addEventListener("click", function () {
+    location.href = "content.html?id=" + courseId + (folderId && folderId !== "0" ? "&path=" + folderId : "");
+  });
+  function fmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+  fb.currentUser().then(function (u) { user = u; }).catch(function () {});
+  fb.ensure().then(bootWithKey).catch(function () {
+    document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Backend unreachable</h2><p class="muted">Set the backend URL and check connection, then retry.</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
+  });
+  async function bootWithKey() {
+    var key;
+    try { key = await fb.mintKey(); }
+    catch (e) {
+      document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Sign-in service unreachable</h2><p class="muted">Playback keys need the backend + Firebase. Check connection and retry.</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
+      return;
+    }
+    if (!user) {
+      var ok = await api.isFreePreview(courseId, contentId).catch(function () { return false; });
+      if (!ok) {
+        ui.toast("Sign in required", "First lecture is free — sign in for the rest");
+        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent("play.html?course=" + courseId + "&content=" + contentId); }, 700);
+        return;
+      }
+      ui.toast("Free preview", "First lecture is free");
+    }
+    try {
+      var headers = await fb.authHeaders().catch(function () { return {}; });
+      play = await api.play(courseId, contentId, key.key, key.deviceId, headers);
+    } catch (e) {
+      document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Couldn\'t load lecture</h2><p class="muted">' + ui.esc(e.message || e) + '</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
+      return;
+    }
+    if (play.file_type === 1) { location.replace("pdf.html?course=" + courseId + "&content=" + contentId); return; }
+    document.getElementById("doc-title").textContent = play.title || "Lecture";
+    document.title = "StudiKitEZ — " + (play.title || "Lecture");
+    attach(play.file_url);
+    loadUpNext(); loadNotes(); loadChat(); setInterval(loadChat, 8000);
+    SK.ads.render();
+  }
+
+  function attach(url) {
+    var yt = !/\.(m3u8|mp4)/i.test(url) && (/^[A-Za-z0-9_-]{11}$/.test(url) || /youtube\.com|youtu\.be/.test(url));
+    if (yt) {
+      var id = /^[A-Za-z0-9_-]{11}$/.test(url) ? url : ((url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/) || [])[1]);
+      document.getElementById("stage").innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?rel=0&modestbranding=1" allowfullscreen title="Lecture"></iframe>';
+      return;
+    }
+    video.style.display = "block";
+    if (/\.m3u8($|\?)/.test(url) && window.Hls && Hls.isSupported()) {
+      hls = new Hls({ maxBufferLength: 60 });
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        var box = document.getElementById("quals");
+        box.innerHTML = '<button class="qpill on" data-q="-1">Auto</button>' +
+          (hls.levels || []).map(function (l, i) { return '<button class="qpill" data-q="' + i + '">' + l.height + 'p</button>'; }).join("");
+        box.querySelectorAll("button").forEach(function (b) {
+          b.addEventListener("click", function () {
+            hls.currentLevel = Number(b.dataset.q);
+            box.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+          });
+        });
+      });
+      hls.loadSource(url); hls.attachMedia(video);
+    } else {
+      video.src = url;
+      document.getElementById("quals").innerHTML = '<span class="mono muted" style="font-size:.7rem">progressive · auto</span>';
+    }
+  }
+
+  document.getElementById("play-btn").addEventListener("click", function () {
+    if (video.style.display === "none") return;
+    if (video.paused) video.play().catch(function () {}); else video.pause();
+  });
+  video.addEventListener("play", function () { document.getElementById("play-btn").textContent = "⏸"; });
+  video.addEventListener("pause", function () { document.getElementById("play-btn").textContent = "▶"; });
+  video.addEventListener("timeupdate", function () {
+    document.getElementById("t-cur").textContent = fmt(video.currentTime);
+    var pct = video.duration ? (video.currentTime / video.duration) * 100 : 0;
+    document.getElementById("seekfill").style.width = pct + "%";
+    document.getElementById("knob").style.left = pct + "%";
+    document.getElementById("seek").setAttribute("aria-valuenow", Math.round(pct));
+    try {
+      var b = video.buffered;
+      if (b.length && video.duration) document.getElementById("buf").style.width = (b.end(b.length - 1) / video.duration) * 100 + "%";
+    } catch (e) {}
+    if (user && video.duration && Date.now() - (video._p || 0) > 15000) {
+      video._p = Date.now();
+      fb.saveProgress(user.uid, courseId, contentId, { pct: Math.min(99, Math.round((video.currentTime / video.duration) * 100)), title: play.title, type: "video" }).catch(function () {});
+    }
+  });
+  video.addEventListener("loadedmetadata", function () { document.getElementById("t-dur").textContent = fmt(video.duration); });
+  video.addEventListener("ended", function () {
+    if (user) fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: play.title, type: "video", done: true }).catch(function () {});
+    ui.toast("Lecture complete ✓", "+10 XP");
+  });
+  var speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2], si = 2;
+  document.getElementById("speed-btn").addEventListener("click", function () {
+    si = (si + 1) % speeds.length; video.playbackRate = speeds[si];
+    document.getElementById("speed-btn").textContent = speeds[si] + "×";
+  });
+  document.getElementById("pip-btn").addEventListener("click", function () {
+    if (document.pictureInPictureElement) document.exitPictureInPicture().catch(function () {});
+    else if (video.requestPictureInPicture) video.requestPictureInPicture().catch(function () { ui.toast("PiP unavailable", ""); });
+  });
+  document.getElementById("fs-btn").addEventListener("click", function () {
+    var st = document.getElementById("stage");
+    if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+    else if (st.requestFullscreen) st.requestFullscreen().catch(function () {});
+  });
+  video.addEventListener("playing", function () { document.getElementById("veil").classList.add("hide"); });
+  video.addEventListener("waiting", function () { document.getElementById("veil").classList.remove("hide"); });
+  video.addEventListener("canplay", function () { document.getElementById("veil").classList.add("hide"); });
+  document.getElementById("stage").addEventListener("dblclick", function () {
+    document.getElementById("fs-btn").click();
+  });
+  function seekTo(clientX) {
+    var r = document.getElementById("seek").getBoundingClientRect();
+    var p = Math.min(Math.max(0, (clientX - r.left) / r.width), 1);
+    if (video.duration) video.currentTime = p * video.duration;
+  }
+  document.getElementById("seek").addEventListener("pointerdown", function (e) {
+    seekTo(e.clientX);
+    var move = function (ev) { seekTo(ev.clientX); };
+    var up = function () { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+  document.getElementById("seek").addEventListener("keydown", function (e) {
+    if (!video.duration) return;
+    if (e.key === "ArrowRight") video.currentTime = Math.min(video.duration, video.currentTime + 10);
+    if (e.key === "ArrowLeft") video.currentTime = Math.max(0, video.currentTime - 10);
+  });
+  try {
+    var sv = parseFloat(localStorage.getItem("sk_vol") || "1");
+    if (!isNaN(sv)) video.volume = Math.max(0, Math.min(1, sv));
+  } catch (e) {}
+  function paintVol() {
+    var muted = video.muted || video.volume === 0;
+    document.getElementById("mute-btn").textContent = muted ? "✕" : "♪";
+    document.getElementById("vol").value = video.muted ? 0 : Math.round(video.volume * 100);
+  }
+  document.getElementById("mute-btn").addEventListener("click", function () {
+    video.muted = !video.muted;
+    try { localStorage.setItem("sk_vol", String(video.muted ? 0 : video.volume)); } catch (e) {}
+    paintVol();
+  });
+  document.getElementById("vol").addEventListener("input", function (e) {
+    var v = Number(e.target.value) / 100;
+    video.volume = v; video.muted = v === 0;
+    try { localStorage.setItem("sk_vol", String(v)); } catch (e) {}
+    paintVol();
+  });
+  paintVol();
+  document.getElementById("dl-btn").addEventListener("click", function () {
+    var links = api.parseLinks(play), url = (links[0] && links[0].url) || (play && play.file_url);
+    if (!url) { ui.toast("Nothing to download", ""); return; }
+    var a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener"; a.download = (play.title || "lecture") + ".mp4";
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (/INPUT|TEXTAREA/.test(e.target.tagName) || video.style.display === "none") return;
+    if (e.code === "Space") { e.preventDefault(); document.getElementById("play-btn").click(); }
+    if (e.code === "ArrowRight") video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+    if (e.code === "ArrowLeft") video.currentTime = Math.max(0, video.currentTime - 10);
+  });
+
+  async function loadUpNext() {
+    var host = document.getElementById("upnext");
+    try {
+      var items = await api.content(courseId, folderId);
+      var files = items.filter(function (x) { return x.type === "file"; });
+      var i = files.findIndex(function (f) { return String(f.entity_id) === String(contentId); });
+      var next = i >= 0 ? files.slice(i + 1, i + 4) : files.slice(0, 3);
+      host.innerHTML = next.length ? "" : '<p class="muted">End of this folder. 🎉</p>';
+      next.forEach(function (f) {
+        var b = document.createElement("button");
+        b.className = "btn btn-secondary btn-sm btn-block";
+        b.style.marginTop = ".5rem"; b.style.justifyContent = "flex-start";
+        b.textContent = ((f.data && f.data.file_type === 1) ? "▤ " : "▶ ") + f.title;
+        b.addEventListener("click", function () {
+          location.href = ((f.data && f.data.file_type === 1) ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + f.entity_id + "&folder=" + encodeURIComponent(folderId);
+        });
+        host.appendChild(b);
+      });
+    } catch (e) { host.innerHTML = '<p class="muted">Up next unavailable.</p>'; }
+  }
+  async function loadNotes() {
+    var host = document.getElementById("notes-list");
+    var notes = await fb.listNotes(courseId, contentId);
+    host.innerHTML = notes.length ? "" : '<p class="muted" style="font-size:.85rem;margin-top:.5rem">No notes yet — jot one down.</p>';
+    notes.forEach(function (n) {
+      var el = document.createElement("div");
+      el.className = "note-row";
+      el.innerHTML = '<span class="mono" style="font-size:.65rem;color:var(--primary-dark)"></span><div></div>';
+      el.querySelector("span").textContent = n.at || "";
+      el.querySelector("div").textContent = n.note || "";
+      host.appendChild(el);
+    });
+  }
+  document.getElementById("note-save").addEventListener("click", async function () {
+    var t = document.getElementById("note-input").value.trim();
+    if (!t) return;
+    if (!user) { ui.toast("Sign in required", "Notes sync to your account"); return; }
+    try {
+      await fb.saveNote(courseId, contentId, fmt(video.currentTime || 0), t);
+      document.getElementById("note-input").value = "";
+      loadNotes(); ui.toast("Saved ✓", "");
+    } catch (e) { ui.toast("Save failed", ""); }
+  });
+  async function loadChat() {
+    var host = document.getElementById("chat-msgs");
+    var list = await fb.listChat(courseId, contentId);
+    host.innerHTML = list.length ? "" : '<p class="muted" style="font-size:.85rem">No messages yet — say hi. 👋</p>';
+    list.forEach(function (m) {
+      var el = document.createElement("div");
+      el.style.fontSize = ".85rem";
+      el.innerHTML = '<span class="mono muted" style="font-size:.65rem"></span> <span></span>';
+      el.children[0].textContent = m.name || "learner";
+      el.children[1].textContent = m.text || "";
+      host.appendChild(el);
+    });
+    host.scrollTop = host.scrollHeight;
+  }
+  document.getElementById("chat-send").addEventListener("click", async function () {
+    var t = document.getElementById("chat-input").value.trim();
+    if (!t) return;
+    if (!user) { ui.toast("Sign in required", ""); return; }
+    try { await fb.sendChat(courseId, contentId, t); document.getElementById("chat-input").value = ""; loadChat(); }
+    catch (e) { ui.toast("Couldn't send", ""); }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Get the App — StudiKitEZ</title>
+<meta name="description" content="Offline lectures, streaks and focus rooms in your pocket. Join the waitlist." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html" class="on">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <span class="kicker">Android · iOS soon</span>
+  <h1 style="font-size:clamp(1.8rem,5vw,2.8rem);letter-spacing:-0.03em;max-width:36rem">Lectures, notes & streaks. In your pocket.</h1>
+  <p class="muted" style="max-width:34rem">Offline downloads, picture-in-picture, focus rooms and instant doubt feed. The web app stays free forever.</p>
+
+  <div class="bento" style="margin-top:2rem">
+    <section class="panel span-4 anim-rise" style="text-align:center" aria-label="Install">
+      <span class="kicker">Scan to install</span>
+      <img id="qr" alt="QR code to install the app" style="margin:0 auto;border:1px solid var(--line);border-radius:10px;width:180px;height:180px" />
+      <div class="mono muted" id="qr-label" style="font-size:.68rem;margin-top:.6rem;word-break:break-all"></div>
+      <div style="display:flex;gap:.5rem;margin-top:1rem">
+        <a class="btn btn-primary btn-sm" style="flex:1" id="apk-btn" href="#">Download APK</a>
+        <button class="btn btn-secondary btn-sm" style="flex:1" id="copy-link">Copy link</button>
+      </div>
+    </section>
+
+    <section class="panel span-8 anim-rise" style="--d:.05s" aria-label="Waitlist">
+      <span class="kicker">Waitlist — notified at launch</span>
+      <div id="waitlist-box">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <input class="input mono" id="wl-contact" placeholder="email or +91 mobile" aria-label="Email or mobile" style="flex:2;min-width:12rem" />
+          <select class="input" id="wl-platform" aria-label="Platform" style="flex:1;min-width:8rem">
+            <option value="android">Android</option>
+            <option value="ios">iOS</option>
+            <option value="both">Both</option>
+          </select>
+          <button class="btn btn-primary" id="wl-join">Notify me</button>
+        </div>
+        <p class="mono muted" style="font-size:.68rem;margin:.6rem 0 0">One message at launch. No spam, ever.</p>
+      </div>
+      <div class="mono muted" style="font-size:.72rem;margin-top:1.2rem" id="wl-count">waitlist open</div>
+      <div class="cards" style="margin-top:1rem;grid-template-columns:1fr">
+        <div class="panel" style="margin-top:0;padding:.9rem"><div class="mono" style="font-size:.7rem;color:var(--primary-dark)">OFFLINE</div><div>Download lectures + PDFs</div></div>
+        <div class="panel" style="margin-top:0;padding:.9rem"><div class="mono" style="font-size:.7rem;color:var(--primary-dark)">FOCUS</div><div>Pomodoro rooms with friends</div></div>
+        <div class="panel" style="margin-top:0;padding:.9rem"><div class="mono" style="font-size:.7rem;color:var(--primary-dark)">STREAKS</div><div>Heatmap + XP, synced</div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="index.html" style="font-size:.85rem">All batches</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  ui.nav(); ui.telegram(); ui.authArea();
+  var qp = function (k) { return new URLSearchParams(location.search).get(k); };
+  var ref = qp("ref");
+  if (ref) { try { localStorage.setItem("sk_pending_ref", ref); } catch (e) {} }
+
+  var APP_URL = location.origin + location.pathname.replace(/app\.html$/, "index.html");
+  document.getElementById("qr").src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&color=000000&bgcolor=ffffff&data=" + encodeURIComponent(APP_URL);
+  document.getElementById("qr-label").textContent = APP_URL;
+  document.getElementById("apk-btn").href = APP_URL;
+  document.getElementById("copy-link").addEventListener("click", function () {
+    if (navigator.clipboard) navigator.clipboard.writeText(APP_URL).then(function () { ui.toast("Copied ✓", "App link ready"); });
+    else prompt("Copy app link:", APP_URL);
+  });
+
+  document.getElementById("wl-count").textContent = "waitlist open — be early 🌱";
+  document.getElementById("wl-join").addEventListener("click", async function () {
+    var contact = document.getElementById("wl-contact").value.trim();
+    var okMail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+    var okPhone = /^[6-9]\d{9}$/.test(contact.replace(/\D/g, "").slice(-10));
+    if (!okMail && !okPhone) { ui.toast("Invalid contact", "Enter an email or 10-digit mobile"); return; }
+    try {
+      await fb.ensure();
+      var fs = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+      var cfg = await SK.api.getConfig();
+      var appMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+      var app = appMod.getApps().find(function (a) { return a.name === "studiki"; }) || appMod.initializeApp(cfg.STUDIKI, "studiki");
+      var db = fs.getFirestore(app);
+      await fs.addDoc(fs.collection(db, "waitlist"), { contact: contact, platform: document.getElementById("wl-platform").value, ref: ref || null, at: Date.now() });
+      document.getElementById("waitlist-box").innerHTML = "<p style=\"font-weight:700\">You're on the list ✓</p><p class=\"muted\">We'll message you at launch.</p>";
+      ui.toast("Joined ✓", "See you at launch");
+    } catch (e) { ui.toast("Couldn't join", "Try again when online"); }
+  });
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

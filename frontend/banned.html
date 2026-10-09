@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Account Suspended — StudiKitEZ</title>
+<meta name="robots" content="noindex" />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .ban-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; background: var(--bg); }
+  .ban-card { max-width: 26rem; width: 100%; border: 2px solid var(--danger); border-radius: 16px; background: var(--surface); padding: 2.25rem; text-align: center; box-shadow: var(--shadow); }
+  .ban-card h1 { color: var(--danger); font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.12em; margin: 1rem 0 0.5rem; }
+</style>
+</head>
+<body>
+<main class="ban-wrap">
+  <div class="ban-card anim-rise">
+    <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.6" style="margin:0 auto" aria-hidden="true">
+      <rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.5" fill="var(--danger)"/>
+    </svg>
+    <h1>ACCOUNT SUSPENDED</h1>
+    <p class="muted" id="reason">This account has been locked and cannot access batches, videos, notes or community features.</p>
+    <div style="display:flex;gap:.5rem;margin-top:1.5rem">
+      <a class="btn btn-secondary btn-sm" style="flex:1" href="index.html">Go home</a>
+      <button class="btn btn-danger btn-sm" style="flex:1" id="signout">Sign out</button>
+    </div>
+    <p class="mono muted" style="font-size:.68rem;margin-top:1.25rem">If this is a mistake, contact support with the reference below.</p>
+    <code class="mono muted" id="refcode" style="font-size:.7rem;word-break:break-all">ref: —</code>
+  </div>
+</main>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script>
+(function () {
+  var uid = "unknown";
+  SK.fb.currentUser().then(function (u) {
+    if (u) {
+      uid = u.uid;
+      var label = u.mobile ? "+91 " + u.mobile : (u.email || u.displayName || "This account");
+      document.getElementById("reason").textContent = label + " has been suspended and cannot access any resources.";
+    }
+  }).catch(function () {});
+  try {
+    var fp = [navigator.userAgent, screen.width, screen.height, Intl.DateTimeFormat().resolvedOptions().timeZone].join("|"), h = 0;
+    for (var i = 0; i < fp.length; i++) h = (h * 31 + fp.charCodeAt(i)) >>> 0;
+    document.getElementById("refcode").textContent = "ref: " + String(uid).slice(0, 8) + "-" + h.toString(16);
+  } catch (e) {}
+  document.getElementById("signout").addEventListener("click", function () {
+    SK.fb.signOut().then(function () { location.href = "index.html"; });
+  });
+})();
+</script>
+</body>
+</html>

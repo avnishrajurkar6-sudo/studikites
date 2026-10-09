@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Course — StudiKitEZ</title>
+<meta name="description" content="Chapters, lectures, notes and live classes for this batch." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .banner { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .banner img { width: 100%; max-height: 300px; object-fit: cover; }
+  .tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid var(--line); margin: 1.25rem 0 0; }
+  .tabs button { background: none; border: 0; padding: 0.7rem 1rem; font-weight: 700; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -2px; min-height: 44px; }
+  .tabs button.on { color: var(--primary-dark); border-bottom-color: var(--primary); }
+  .crumbs { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 1rem; }
+  .crumbs a { color: var(--muted); text-decoration: none; } .crumbs a:hover { color: var(--primary-dark); }
+  .liverow { display: flex; gap: 0.9rem; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.9rem 1rem; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<div class="banner">
+  <img id="banner-img" alt="" style="display:none" />
+  <div class="wrap" style="padding-top:1.25rem;padding-bottom:1.25rem">
+    <span class="kicker">Open access</span>
+    <h1 id="course-title" style="margin:0">Loading…</h1>
+    <p class="mono muted" id="course-meta" style="font-size:.75rem;margin:.3rem 0 0"></p>
+    <div style="display:flex;gap:.5rem;margin-top:.9rem;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" id="continue-btn">Continue ↓</button>
+      <button class="btn btn-secondary btn-sm" id="enroll-btn">+ Enroll</button>
+    </div>
+  </div>
+</div>
+
+<main class="page" id="main" style="padding-top:0"><div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+    <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+    <span id="back-slot"></span>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Course sections">
+    <button data-tab="overview" role="tab">Overview</button>
+    <button data-tab="content" role="tab" class="on" aria-selected="true">Content</button>
+    <button data-tab="live" role="tab">Live Classes</button>
+  </div>
+
+  <section id="panel-overview" hidden><div class="bento" id="ov-grid" style="margin-top:1.25rem"></div></section>
+  <section id="panel-content"><div class="cards" id="grid" style="margin-top:1.25rem" aria-live="polite"></div></section>
+  <section id="panel-live" hidden>
+    <div class="seg" id="live-tabs" style="margin-top:1.25rem" role="tablist" aria-label="Live filters">
+      <button data-lt="1" class="on">Live</button>
+      <button data-lt="0">Upcoming</button>
+      <button data-lt="2">Completed</button>
+    </div>
+    <div id="live-list" style="margin-top:1rem;display:flex;flex-direction:column;gap:.75rem"></div>
+  </section>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="index.html" style="font-size:.85rem">All batches</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, api = SK.api, fb = SK.fb;
+  var qp = function (k) { return new URLSearchParams(location.search).get(k); };
+  var courseId = qp("id") || "";
+  var pathIds = (qp("path") || "").split("/").filter(Boolean);
+  var items = [], titles = new Map(), liveTab = "1", user = null, info = { title: "Course " + courseId, thumbnail: "" };
+  ui.nav(); ui.telegram();
+
+  try { titles = new Map(JSON.parse(sessionStorage.getItem("sk_titles_" + courseId) || "[]")); } catch (e) {}
+  function saveTitles() { try { sessionStorage.setItem("sk_titles_" + courseId, JSON.stringify(Array.from(titles.entries()).slice(-60))); } catch (e) {} }
+
+  fb.currentUser().then(function (u) { user = u; ui.authArea(); markFree(); }).catch(function () { ui.authArea(); markFree(); });
+
+  api.allBatches().then(function (all) {
+    var hit = all.find(function (b) { return String(b.id) === String(courseId); });
+    if (hit) info = hit;
+    document.title = "StudiKitEZ — " + info.title;
+    document.getElementById("course-title").textContent = info.title;
+    if (info.thumbnail) {
+      var im = document.getElementById("banner-img");
+      im.src = info.thumbnail; im.alt = info.title;
+      im.onload = function () { im.style.display = "block"; };
+      im.onerror = function () { im.style.display = "none"; };
+    }
+    paintEnroll();
+  }).catch(function () { document.getElementById("course-title").textContent = info.title; });
+
+  function paintEnroll() {
+    var en = fb.enrolled(), id = isNaN(Number(courseId)) ? courseId : Number(courseId);
+    document.getElementById("enroll-btn").textContent = en.indexOf(id) >= 0 ? "✓ Enrolled" : "+ Enroll";
+  }
+  document.getElementById("enroll-btn").addEventListener("click", function () {
+    var id = isNaN(Number(courseId)) ? courseId : Number(courseId);
+    fb.toggleEnroll(id); paintEnroll(); ui.toast("Updated", info.title);
+  });
+  document.getElementById("continue-btn").addEventListener("click", function () {
+    document.getElementById("grid").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  function crumbs() {
+    var c = document.getElementById("crumbs"); c.innerHTML = "";
+    function link(label, href) {
+      var a = document.createElement("a"); a.textContent = label; a.href = href; return a;
+    }
+    function sep() { var s = document.createElement("span"); s.textContent = "/"; s.className = "muted"; return s; }
+    c.appendChild(link("Catalog", "index.html")); c.appendChild(sep());
+    c.appendChild(link(info.title.length > 26 ? info.title.slice(0, 26) + "…" : info.title, "content.html?id=" + courseId));
+    pathIds.forEach(function (id, i) {
+      c.appendChild(sep());
+      c.appendChild(link(titles.get(id) || ("Folder " + id), "content.html?id=" + courseId + "&path=" + pathIds.slice(0, i + 1).join("/")));
+    });
+    var bs = document.getElementById("back-slot"); bs.innerHTML = "";
+    if (pathIds.length) {
+      var b = document.createElement("button"); b.className = "btn btn-ghost btn-sm"; b.textContent = "← Back";
+      b.addEventListener("click", function () {
+        var p = pathIds.slice(0, -1).join("/");
+        location.href = p ? "content.html?id=" + courseId + "&path=" + p : "content.html?id=" + courseId;
+      });
+      bs.appendChild(b);
+    }
+  }
+
+  function num(v) {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === "object") {
+      if ("free" in v || "paid" in v) return (v.free || 0) + (v.paid || 0);
+      if ("total" in v || "direct" in v) return v.total || v.direct || 0;
+      return 0;
+    }
+    return typeof v === "number" ? v : parseInt(String(v), 10) || 0;
+  }
+  function folderCard(it, i) {
+    var cc = (it.data && it.data.content_counts) || {};
+    var v = num(cc.video !== undefined ? cc.video : cc.videos), p = num(cc.pdf !== undefined ? cc.pdf : cc.pdfs);
+    var el = document.createElement("article");
+    el.className = "bcard anim-rise"; el.style.setProperty("--d", Math.min(i * 0.04, 0.4) + "s");
+    el.style.cursor = "pointer"; el.tabIndex = 0;
+    el.setAttribute("role", "link"); el.setAttribute("aria-label", "Open folder " + it.title);
+    el.innerHTML = '<div class="thumb" style="display:grid;place-items:center;font-size:2.2rem;min-height:120px" aria-hidden="true">📁</div>' +
+      '<div class="body"><div class="meta">' + v + ' VIDEOS · ' + p + ' PDFS</div><h3></h3>' +
+      '<div><span class="mono" style="font-size:.75rem;color:var(--primary-dark)">Open folder →</span></div></div>';
+    el.querySelector("h3").textContent = it.title;
+    function go() {
+      titles.set(String(it.entity_id), it.title); saveTitles();
+      location.href = "content.html?id=" + courseId + "&path=" + pathIds.concat([it.entity_id]).join("/");
+    }
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    return el;
+  }
+  function fileCard(it, i) {
+    var isPdf = it.data && it.data.file_type === 1;
+    var th = it.data && typeof it.data.thumbnail === "string" && it.data.thumbnail.indexOf("http") === 0 ? it.data.thumbnail : "";
+    var dur = api.fmtDur(it.data && it.data.duration);
+    var el = document.createElement("article");
+    el.className = "bcard anim-rise"; el.style.setProperty("--d", Math.min(i * 0.04, 0.4) + "s");
+    el.style.cursor = "pointer"; el.tabIndex = 0;
+    el.innerHTML = '<div class="thumb">' +
+      (th ? '<img loading="lazy" alt="" />' : '<span style="position:absolute;inset:0;display:grid;place-items:center;font-size:2rem;color:var(--muted)">' + (isPdf ? "▤" : "▶") + "</span>") +
+      (isPdf ? "" : '<span class="mono" style="position:absolute;bottom:.5rem;right:.5rem;background:rgba(20,25,20,.85);color:#fff;font-size:.68rem;padding:.1rem .45rem;border-radius:6px">' + ui.esc(dur) + "</span>") +
+      '</div><div class="body"><div class="meta">' + (isPdf ? "PDF NOTES" : "VIDEO · " + ui.esc(dur)) + ' · <span data-free></span></div><h3></h3>' +
+      '<div><span class="mono" style="font-size:.75rem;color:var(--primary-dark)">' + (isPdf ? "Read →" : "Play →") + "</span></div></div>";
+    if (th) { var img = el.querySelector("img"); img.src = th; img.alt = it.title; img.onerror = function () { img.style.display = "none"; }; }
+    el.querySelector(".thumb").style.position = "relative";
+    el.querySelector("h3").textContent = it.title;
+    function go() {
+      try { sessionStorage.setItem("player_" + courseId + "_" + it.entity_id, JSON.stringify(it)); } catch (e) {}
+      function open() {
+        var folder = pathIds.length ? pathIds[pathIds.length - 1] : "0";
+        location.href = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + "&folder=" + encodeURIComponent(folder);
+      }
+      if (user) { open(); return; }
+      api.isFreePreview(courseId, it.entity_id).then(function (ok) {
+        if (ok) { ui.toast("Free preview", "First lecture is free"); open(); }
+        else {
+          ui.toast("Sign in required", "First lecture is free — sign in for the rest");
+          setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(((isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id)); }, 600);
+        }
+      });
+    }
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    return el;
+  }
+  function markFree() {
+    if (user) return;
+    api.freePreviewId(courseId).then(function (id) {
+      if (!id) return;
+      var files = items.filter(function (x) { return x.type === "file"; });
+      var idx = files.findIndex(function (f) { return String(f.entity_id) === String(id); });
+      if (idx < 0) return;
+      var folders = items.filter(function (x) { return x.type === "folder"; }).length;
+      var card = document.querySelectorAll("#grid .bcard")[folders + idx];
+      var slot = card && card.querySelector("[data-free]");
+      if (slot) slot.innerHTML = '<span class="badge-free">FREE</span>';
+    }).catch(function () {});
+  }
+  function renderGrid() {
+    var folders = items.filter(function (x) { return x.type === "folder"; });
+    var files = items.filter(function (x) { return x.type === "file"; });
+    var vids = files.filter(function (f) { return !(f.data && f.data.file_type === 1); }).length;
+    var pdfs = files.length - vids;
+    document.getElementById("course-meta").textContent = folders.length + " folders · " + vids + " videos · " + pdfs + " pdfs";
+    document.getElementById("ov-grid").innerHTML =
+      [["Folders", folders.length], ["Videos", vids], ["PDFs", pdfs]].map(function (s) {
+        return '<div class="panel span-4"><div class="stat-label">' + s[0] + '</div><div class="stat-num">' + s[1] + "</div></div>";
+      }).join("") +
+      '<div class="panel span-12"><h3>About this batch</h3><p class="muted" style="margin:0">Concepts first, then problem solving. Lectures and notes open in a calm, distraction-free player.</p></div>';
+    var grid = document.getElementById("grid"); grid.innerHTML = "";
+    if (!items.length) {
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Empty folder</h3><p>Go back or try another chapter.</p></div>';
+    } else {
+      items.forEach(function (it, i) { grid.appendChild(it.type === "folder" ? folderCard(it, i) : fileCard(it, i)); });
+    }
+    markFree();
+  }
+
+  document.querySelectorAll(".tabs button").forEach(function (b) {
+    b.addEventListener("click", function () { setTab(b.dataset.tab); });
+  });
+  function setTab(t) {
+    document.querySelectorAll(".tabs button").forEach(function (x) {
+      var on = x.dataset.tab === t;
+      x.classList.toggle("on", on);
+      if (on) x.setAttribute("aria-selected", "true"); else x.removeAttribute("aria-selected");
+    });
+    document.getElementById("panel-overview").hidden = t !== "overview";
+    document.getElementById("panel-content").hidden = t !== "content";
+    document.getElementById("panel-live").hidden = t !== "live";
+    if (t === "live") loadLive();
+  }
+  document.querySelectorAll("#live-tabs button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#live-tabs button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      liveTab = b.dataset.lt; loadLive();
+    });
+  });
+  function fmtT(ts) {
+    if (!ts) return "";
+    var n = Number(ts);
+    if (isNaN(n)) return String(ts);
+    if (n < 1e10) n *= 1000;
+    return new Date(n).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "numeric", minute: "2-digit" });
+  }
+  async function loadLive() {
+    var list = document.getElementById("live-list");
+    list.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
+    var ck = "sk_live_" + courseId + "_" + liveTab;
+    try {
+      var key = await fb.mintKey();
+      var arr = await api.live(courseId, liveTab, key.key, key.deviceId);
+      try { localStorage.setItem(ck, JSON.stringify({ at: Date.now(), items: arr })); } catch (e) {}
+      if (!arr.length) {
+        var label = liveTab === "1" ? "live" : liveTab === "0" ? "upcoming" : "completed";
+        list.innerHTML = '<div class="empty"><h3>No ' + label + ' classes</h3><p>Check another tab or come back later.</p></div>';
+        return;
+      }
+      paintLive(arr, false);
+    } catch (e) {
+      var cached = null;
+      try { cached = JSON.parse(localStorage.getItem(ck) || "null"); } catch (err) {}
+      if (cached && cached.items && cached.items.length) paintLive(cached.items, true);
+      else {
+        list.innerHTML = '<div class="empty"><h3>Live server unreachable</h3><p>Check your connection and retry.</p><button class="btn btn-primary btn-sm" id="live-retry" style="margin-top:.75rem">Retry</button></div>';
+        document.getElementById("live-retry").addEventListener("click", loadLive);
+      }
+    }
+  }
+  function paintLive(arr, stale) {
+    var list = document.getElementById("live-list"); list.innerHTML = "";
+    if (stale) {
+      var n = document.createElement("div");
+      n.className = "panel";
+      n.innerHTML = '<span class="muted">Showing saved classes — live server unreachable.</span> <button class="btn btn-secondary btn-sm" id="live-retry" style="margin-left:.5rem">Retry</button>';
+      list.appendChild(n);
+      n.querySelector("#live-retry").addEventListener("click", loadLive);
+    }
+    arr.forEach(function (c) {
+      var vid = c.video_id || c.id;
+      var row = document.createElement("div");
+      row.className = "liverow anim-rise";
+      var title = document.createElement("div");
+      title.innerHTML = '<div style="font-weight:700"></div><div class="mono muted" style="font-size:.7rem"></div>';
+      title.children[0].textContent = (liveTab === "1" ? "● " : "") + (c.title || "Untitled class");
+      title.children[1].textContent = fmtT(c.created_at || c.live_from || c.start_time);
+      row.appendChild(title);
+      if (liveTab === "1" || liveTab === "2") {
+        var btn = document.createElement("button");
+        btn.className = "btn btn-primary btn-sm"; btn.textContent = "Watch";
+        btn.addEventListener("click", function () {
+          if (!vid) { ui.toast("Unavailable", "Stream ID missing"); return; }
+          try { sessionStorage.setItem("live_" + courseId + "_" + vid, JSON.stringify({ title: c.title, thumbnail: c.thumbnail })); } catch (e) {}
+          location.href = "play.html?course=" + courseId + "&content=" + vid + "&live=1";
+        });
+        row.appendChild(btn);
+      } else {
+        var s = document.createElement("span"); s.className = "mono muted"; s.style.fontSize = ".7rem"; s.textContent = "SOON";
+        row.appendChild(s);
+      }
+      list.appendChild(row);
+    });
+  }
+
+  ui.skeleton(document.getElementById("grid"), 6);
+  crumbs();
+  api.content(courseId, pathIds.length ? pathIds[pathIds.length - 1] : "0").then(function (data) {
+    items = data;
+    data.forEach(function (it) { titles.set(String(it.entity_id), it.title); });
+    saveTitles(); crumbs(); renderGrid();
+  }).catch(function (e) {
+    document.getElementById("grid").innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Couldn\'t reach the server</h3><p>' + ui.esc(e.message || e) + '</p><button class="btn btn-primary btn-sm" id="retry" style="margin-top:.75rem">Retry</button></div>';
+    document.getElementById("retry").addEventListener("click", function () { location.reload(); });
+  });
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

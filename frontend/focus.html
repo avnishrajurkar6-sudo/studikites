@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Focus Rooms — StudiKitEZ</title>
+<meta name="description" content="Pomodoro focus rooms: study together, stay accountable." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html" class="on">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <div class="page-head">
+    <span class="kicker">Pomodoro · together</span>
+    <h1>Study together.</h1>
+    <p>25 minutes focus, 5 minutes rest. No video, no audio — just quiet accountability.</p>
+  </div>
+
+  <div class="bento">
+    <section class="panel span-8 anim-rise" style="text-align:center" aria-label="Pomodoro timer">
+      <div class="seg" id="mode-seg" role="tablist" aria-label="Session length">
+        <button data-m="25" class="on">25 / 5</button>
+        <button data-m="50">50 / 10</button>
+        <button data-m="90">90 / 15</button>
+      </div>
+      <div class="timer-digits mono" id="digits" role="timer" aria-live="off">25:00</div>
+      <div class="mono muted" id="phase" style="font-size:.72rem;letter-spacing:.14em">READY · FOCUS NEXT</div>
+      <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn btn-primary" id="t-start">Start</button>
+        <button class="btn btn-secondary" id="t-reset">Reset</button>
+        <button class="btn btn-ghost" id="t-sound" aria-pressed="false">Sound: off</button>
+      </div>
+      <div class="mono muted" style="font-size:.68rem;margin-top:.8rem" id="t-stats">sign in to track sessions</div>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.05s" aria-label="Room members">
+      <span class="kicker">In this room <span class="live-dot"></span></span>
+      <div class="avatar-stack" id="avatars" style="margin:.4rem 0 .6rem"></div>
+      <div class="mono muted" id="member-line" style="font-size:.72rem">— studying</div>
+      <div style="display:flex;gap:.5rem;margin-top:1rem">
+        <input class="input mono" id="room-name" value="room-1" aria-label="Room name" style="font-size:.85rem" />
+        <button class="btn btn-secondary btn-sm" id="room-join">Join</button>
+      </div>
+      <p class="mono muted" style="font-size:.65rem;margin:.6rem 0 0">Sign-in required to appear · heartbeat every 20s</p>
+    </section>
+
+    <section class="panel span-12 anim-rise" style="--d:.1s" aria-label="All rooms">
+      <span class="kicker">All rooms</span>
+      <div id="rooms" class="cards"></div>
+    </section>
+  </div>
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="dashboard.html" style="font-size:.85rem">Dashboard</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  ui.nav(); ui.telegram();
+  var user = null;
+  fb.currentUser().then(function (u) { user = u; ui.authArea(); if (u) stats(); }).catch(function () { ui.authArea(); });
+  var BREAKS = { 25: 5, 50: 10, 90: 15 };
+  var focusMin = 25, breakMin = 5, remaining = 25 * 60, running = false, onBreak = false, tick = null, sound = false;
+
+  document.querySelectorAll("#mode-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#mode-seg button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      focusMin = Number(b.dataset.m); breakMin = BREAKS[focusMin];
+      onBreak = false; remaining = focusMin * 60; running = false;
+      clearInterval(tick); paint();
+      document.getElementById("t-start").textContent = "Start";
+    });
+  });
+  function paint() {
+    var m = String(Math.floor(remaining / 60)).padStart(2, "0"), s = String(remaining % 60).padStart(2, "0");
+    document.getElementById("digits").textContent = m + ":" + s;
+    document.getElementById("phase").textContent = running ? (onBreak ? "BREAK · REST YOUR EYES" : "FOCUS · STAY WITH IT") : "READY · FOCUS NEXT";
+    document.title = m + ":" + s + (onBreak ? " · break" : " · focus") + " — StudiKitEZ";
+  }
+  function beep() {
+    if (!sound) return;
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = onBreak ? 520 : 880; g.gain.value = 0.07;
+      o.start(); o.stop(ctx.currentTime + 0.4);
+    } catch (e) {}
+  }
+  document.getElementById("t-sound").addEventListener("click", function () {
+    sound = !sound;
+    this.textContent = "Sound: " + (sound ? "on" : "off");
+    this.setAttribute("aria-pressed", sound ? "true" : "false");
+  });
+  document.getElementById("t-reset").addEventListener("click", function () {
+    running = false; clearInterval(tick);
+    remaining = (onBreak ? breakMin : focusMin) * 60;
+    document.getElementById("t-start").textContent = "Start"; paint();
+  });
+  document.getElementById("t-start").addEventListener("click", function () {
+    running = !running;
+    this.textContent = running ? "Pause" : "Resume";
+    clearInterval(tick);
+    if (!running) { paint(); return; }
+    tick = setInterval(function () {
+      remaining--;
+      if (remaining <= 0) {
+        beep();
+        if (!onBreak) {
+          fb.studyLog(focusMin);
+          try {
+            var k = "sk_activity_" + fb.dayKey();
+            localStorage.setItem(k, String(Math.min(999, (parseInt(localStorage.getItem(k) || "0", 10) || 0) + focusMin)));
+          } catch (e) {}
+          ui.toast("Focus block done ✓", focusMin + " min logged — take " + breakMin + " off");
+          stats();
+        } else ui.toast("Break over", "Back to focus 🌿");
+        onBreak = !onBreak;
+        remaining = (onBreak ? breakMin : focusMin) * 60;
+      }
+      paint();
+    }, 1000);
+    paint();
+  });
+  async function stats() {
+    if (!user) return;
+    try {
+      var d = await fb.userDoc(user.uid);
+      void d;
+    } catch (e) {}
+    document.getElementById("t-stats").textContent = "sessions save to your study log";
+  }
+  paint();
+
+  var roomId = "room-1";
+  async function joinRoom() {
+    roomId = (document.getElementById("room-name").value.trim() || "room-1").slice(0, 40);
+    if (!user) { ui.toast("Sign in required", "Rooms need an account"); renderRoster([]); return; }
+    try {
+      await fb.focusJoin(roomId);
+      ui.toast("Joined ✓", roomId);
+      pollRoster();
+    } catch (e) { ui.toast("Join failed", ""); }
+  }
+  document.getElementById("room-join").addEventListener("click", joinRoom);
+  function renderRoster(members) {
+    var av = document.getElementById("avatars"); av.innerHTML = "";
+    members.slice(0, 12).forEach(function (m) {
+      var s = document.createElement("span");
+      s.textContent = String(m.name || "?").charAt(0).toUpperCase();
+      s.title = m.name || "";
+      av.appendChild(s);
+    });
+    document.getElementById("member-line").textContent = members.length ? members.length + " studying now" : "empty — you could be first";
+  }
+  async function pollRoster() {
+    renderRoster(await fb.focusRoster(roomId));
+    setTimeout(function () { if (document.body.contains(document.getElementById("avatars"))) pollRoster(); }, 15000);
+  }
+  async function listRooms() {
+    var host = document.getElementById("rooms");
+    if (!user) { host.innerHTML = '<p class="muted">Sign in to see rooms.</p>'; return; }
+    var rooms = await fb.focusRooms();
+    host.innerHTML = rooms.length ? "" : '<p class="muted">No rooms yet — join "' + ui.esc(roomId) + '" to create it.</p>';
+    rooms.forEach(function (r) {
+      var m = r.members || {}, now = Date.now();
+      var n = Object.keys(m).filter(function (k) { return now - ((m[k] || {}).at || 0) < 90000; }).length;
+      var el = document.createElement("button");
+      el.className = "panel anim-rise"; el.style.textAlign = "left"; el.style.marginTop = "0";
+      el.innerHTML = '<div style="font-weight:700"></div><div class="mono muted" style="font-size:.7rem;margin-top:.2rem">' + n + " in room</div>";
+      el.firstChild.textContent = r.name || r.id;
+      el.addEventListener("click", function () { document.getElementById("room-name").value = r.id || r.name; joinRoom(); });
+      host.appendChild(el);
+    });
+  }
+  joinRoom(); listRooms();
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudiKitEZ — Batches</title>
+<meta name="description" content="Browse batches. First lecture of every batch is free." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html" class="on">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <div class="page-head">
+    <span class="kicker">Catalog · <span id="count">—</span> batches</span>
+    <h1>Find your batch</h1>
+    <p>Every batch opens with a free first lecture. Sign in to unlock the rest.</p>
+  </div>
+
+  <div class="search" role="search">
+    <span aria-hidden="true">⌕</span>
+    <input id="q" type="search" placeholder="Search batches…" autocomplete="off" aria-label="Search batches" />
+  </div>
+
+  <div class="cards" id="grid" style="margin-top:1.25rem" aria-live="polite"></div>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.85rem">Telegram</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, grid = document.getElementById("grid"), q = document.getElementById("q"), all = [];
+  ui.nav(); ui.telegram(); ui.authArea();
+  function enrolled() { try { return JSON.parse(localStorage.getItem("sk_enrolled") || "[]"); } catch (e) { return []; } }
+  function render(filter) {
+    grid.innerHTML = "";
+    var s = String(filter || "").trim().toLowerCase();
+    var list = !s ? all : all.filter(function (b) {
+      return String(b.title || "").toLowerCase().indexOf(s) >= 0 || String(b.id).indexOf(s) >= 0;
+    });
+    document.getElementById("count").textContent = list.length;
+    if (!list.length) {
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>No matches</h3><p>Try a different search.</p></div>';
+      return;
+    }
+    var en = enrolled();
+    list.forEach(function (b, i) {
+      var card = document.createElement("article");
+      card.className = "bcard anim-rise";
+      card.style.setProperty("--d", Math.min(i * 0.04, 0.4) + "s");
+      var isEn = en.indexOf(b.id) >= 0;
+      card.innerHTML = '<div class="thumb"><img loading="lazy" alt="" /></div>' +
+        '<div class="body"><div class="meta">BATCH ' + ui.esc(b.id) + (b.fresh ? ' · <span class="badge-new">NEW</span>' : "") + '</div>' +
+        "<h3></h3>" +
+        '<div style="display:flex;gap:.5rem;margin-top:auto">' +
+        '<button class="btn btn-secondary btn-sm" data-a="enroll" style="flex:1">' + (isEn ? "✓ Enrolled" : "+ Enroll") + "</button>" +
+        '<button class="btn btn-primary btn-sm" data-a="open" style="flex:1">Open →</button></div></div>';
+      var img = card.querySelector("img");
+      img.src = b.thumbnail; img.alt = b.title;
+      img.onerror = function () { img.style.display = "none"; };
+      card.querySelector("h3").textContent = b.title;
+      card.querySelector('[data-a="enroll"]').addEventListener("click", function () {
+        SK.fb.toggleEnroll(b.id); render(q.value);
+        ui.toast(isEn ? "Unenrolled" : "Enrolled ✓", b.title);
+      });
+      card.querySelector('[data-a="open"]').addEventListener("click", function () {
+        location.href = "content.html?id=" + encodeURIComponent(b.id);
+      });
+      grid.appendChild(card);
+    });
+  }
+  ui.skeleton(grid, 6);
+  SK.api.allBatches().then(function (batches) {
+    var seen = [];
+    try { seen = JSON.parse(localStorage.getItem("sk_seen_batches") || "[]"); } catch (e) {}
+    all = batches.map(function (b) { return { id: b.id, title: b.title, thumbnail: b.thumbnail, fresh: seen.indexOf(b.id) < 0 }; });
+    try { localStorage.setItem("sk_seen_batches", JSON.stringify(batches.map(function (b) { return b.id; }))); } catch (e) {}
+    render("");
+  }).catch(function () {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Catalog unavailable</h3><p>Check your connection and retry.</p></div>';
+  });
+  q.addEventListener("input", function () { render(q.value); });
+  SK.ads.render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — StudiKitEZ</title>
+<meta name="description" content="Your learning overview: streaks, batches, focus rooms, community." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html" class="on">Dashboard</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <div class="page-head">
+    <span class="kicker">Dashboard</span>
+    <h1 id="greet">Overview</h1>
+    <p id="sub">Your learning at a glance.</p>
+  </div>
+
+  <div class="bento">
+    <section class="panel span-8 anim-rise" aria-label="Continue learning">
+      <span class="kicker">Continue learning</span>
+      <div id="active-body"><div class="spinner" role="status"></div></div>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.05s" aria-label="Streak">
+      <span class="kicker">Streak</span>
+      <div class="stat-num"><span id="streak-n">—</span> <span class="muted" style="font-size:.9rem">days</span></div>
+      <div class="mono muted" id="streak-best" style="font-size:.7rem;margin:.25rem 0 .8rem">best —</div>
+      <div class="heat" id="heatmap" role="img" aria-label="12-week activity heatmap"></div>
+      <div class="mono muted" style="font-size:.68rem;margin-top:.5rem;display:flex;justify-content:space-between"><span>12 wks</span><span id="xp-line">xp —</span></div>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.1s" aria-label="Focus room">
+      <span class="kicker">Focus room</span>
+      <div id="focus-body"><span class="muted">Checking rooms…</span></div>
+      <a class="btn btn-secondary btn-sm btn-block" style="margin-top:.9rem" href="focus.html">Open focus rooms</a>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.15s" aria-label="Plan">
+      <span class="kicker">Plan</span>
+      <div id="plan-body"><span class="muted">Checking plan…</span></div>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.2s" aria-label="Referrals">
+      <span class="kicker">Referrals</span>
+      <div class="stat-num" id="ref-n">—</div>
+      <div class="mono muted" style="font-size:.7rem" id="ref-sub">+1 ad-free day per signup</div>
+      <button class="btn btn-secondary btn-sm btn-block" style="margin-top:.9rem" id="copy-ref">Copy referral link</button>
+    </section>
+
+    <section class="panel span-8 anim-rise" style="--d:.25s" aria-label="Community">
+      <span class="kicker">Community</span>
+      <div id="feed-body"><span class="muted">Loading posts…</span></div>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.3s" aria-label="Announcements">
+      <span class="kicker">Announcements</span>
+      <div id="ann-body"><span class="muted">—</span></div>
+    </section>
+  </div>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="index.html" style="font-size:.85rem">All batches</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, api = SK.api, fb = SK.fb;
+  ui.nav(); ui.telegram();
+  function dayKey(d) { d = d || new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function heatmap() {
+    var host = document.getElementById("heatmap"); host.innerHTML = "";
+    var today = new Date();
+    for (var i = 83; i >= 0; i--) {
+      var d = new Date(today); d.setDate(d.getDate() - i), pts = 0;
+      try { pts = parseInt(localStorage.getItem("sk_activity_" + dayKey(d)) || "0", 10) || 0; } catch (e) {}
+      var c = document.createElement("span");
+      c.dataset.l = pts <= 0 ? 0 : pts < 3 ? 1 : pts < 6 ? 2 : pts < 10 ? 3 : 4;
+      c.title = dayKey(d);
+      host.appendChild(c);
+    }
+  }
+
+  fb.requireLogin("dashboard.html").then(function (user) {
+    ui.authArea();
+    document.getElementById("greet").textContent = "Namaste, " + (user.displayName && user.displayName.indexOf("+91") !== 0 ? user.displayName.split(" ")[0] : "learner") + " 👋";
+    heatmap();
+    fb.claimRewards().catch(function () {});
+    activeBatch(user); streakBox(user); planBox(user); refBox(user);
+    focusBox(); feedBox(); annBox();
+    SK.ads.render();
+  }).catch(function () {});
+
+  async function activeBatch(user) {
+    var host = document.getElementById("active-body");
+    try {
+      var all = await api.allBatches(), en = fb.enrolled();
+      var pick = all.find(function (b) { return en.indexOf(b.id) >= 0; }) || all[0];
+      if (!pick) { host.innerHTML = '<p class="muted">No batches found.</p>'; return; }
+      var pct = 0, last = "";
+      try {
+        var p = await fb.progress(user.uid, pick.id);
+        var keys = Object.keys(p.watched || {}), done = keys.filter(function (k) { return p.watched[k].done; }).length;
+        pct = keys.length ? Math.round((done / keys.length) * 100) : 0;
+        last = p.lastTitle || "";
+      } catch (e) {}
+      host.innerHTML = '<div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">' +
+        '<img alt="" style="width:10rem;aspect-ratio:16/9;object-fit:cover;border-radius:10px;border:1px solid var(--line)" />' +
+        '<div style="flex:1;min-width:12rem"><div class="mono muted" style="font-size:.68rem">BATCH ' + ui.esc(pick.id) + '</div>' +
+        "<div style=\"font-weight:700;margin:.15rem 0 .6rem\" data-title></div>" +
+        '<div class="progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><div style="width:' + pct + '%"></div></div>' +
+        '<div class="mono muted" style="font-size:.68rem;margin-top:.35rem">' + pct + '% complete' + (last ? " · " + ui.esc(last) : "") + "</div>" +
+        '<div style="display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap"><a class="btn btn-primary btn-sm" href="content.html?id=' + pick.id + '">Open course →</a></div></div></div>';
+      var img = host.querySelector("img");
+      img.src = pick.thumbnail; img.alt = pick.title;
+      img.onerror = function () { img.style.display = "none"; };
+      host.querySelector("[data-title]").textContent = pick.title;
+    } catch (e) { host.innerHTML = '<p class="muted">Couldn\'t load batches.</p>'; }
+  }
+  async function streakBox(user) {
+    try {
+      var d = await fb.userDoc(user.uid), g = (d && d.gamification) || {}, st = g.streak || {};
+      document.getElementById("streak-n").textContent = st.current || 0;
+      document.getElementById("streak-best").textContent = "best " + (st.best || 0);
+      document.getElementById("xp-line").textContent = "xp " + (g.xp || 0);
+    } catch (e) {}
+  }
+  async function planBox() {
+    var host = document.getElementById("plan-body");
+    var free = await SK.ads.adFree().catch(function () { return false; });
+    host.innerHTML = free
+      ? '<div class="stat-num" style="font-size:1.1rem;color:var(--primary-dark)">AD-FREE ✓</div><div class="mono muted" style="font-size:.7rem">subscription or referral credit active</div>'
+      : '<div class="mono" style="font-size:.95rem">Free plan</div><div class="mono muted" style="font-size:.7rem">light display ads only · never popups</div>';
+  }
+  async function refBox(user) {
+    try {
+      var r = await fb.myReferrals();
+      document.getElementById("ref-n").textContent = r.count;
+      document.getElementById("ref-sub").textContent = r.freeDaysLeft + " ad-free day(s) banked · +1 per signup";
+    } catch (e) { document.getElementById("ref-n").textContent = "—"; }
+    document.getElementById("copy-ref").addEventListener("click", function () {
+      var link = location.origin + location.pathname.replace(/dashboard\.html$/, "login.html") + "?ref=" + encodeURIComponent(user.uid);
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(function () { ui.toast("Copied ✓", "Referral link ready"); });
+      else prompt("Copy referral link:", link);
+    });
+  }
+  async function focusBox() {
+    var host = document.getElementById("focus-body");
+    try {
+      var rooms = await fb.focusRooms();
+      var total = 0, name = "";
+      rooms.forEach(function (r) {
+        var m = r.members || {}, now = Date.now();
+        var n = Object.keys(m).filter(function (k) { return now - ((m[k] || {}).at || 0) < 90000; }).length;
+        if (n > total) { total = n; name = r.name || r.id; }
+      });
+      host.innerHTML = total
+        ? '<div><span class="live-dot"></span> <strong>' + ui.esc(name) + '</strong></div><div class="mono muted" style="font-size:.72rem;margin-top:.3rem">' + total + " studying now</div>"
+        : '<div class="mono muted">no live room right now</div><div class="muted" style="font-size:.85rem">Start one — others can join you.</div>';
+    } catch (e) { host.innerHTML = '<span class="muted">Rooms unavailable offline.</span>'; }
+  }
+  async function feedBox() {
+    var host = document.getElementById("feed-body");
+    var posts = await fb.postsRecent(3);
+    if (!posts.length) { host.innerHTML = '<p class="muted">No posts yet — be the first to ask a doubt.</p>'; return; }
+    host.innerHTML = "";
+    posts.forEach(function (p) {
+      var el = document.createElement("div");
+      el.className = "feed-item";
+      el.innerHTML = '<div class="mono muted" style="font-size:.68rem;margin-bottom:.2rem"></div><div></div>';
+      el.children[0].textContent = p.name + (p.at ? " · " + new Date(p.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "");
+      el.children[1].textContent = p.text;
+      host.appendChild(el);
+    });
+  }
+  async function annBox() {
+    var host = document.getElementById("ann-body");
+    var anns = await fb.announcements(3);
+    if (!anns.length) { host.innerHTML = '<span class="muted">Nothing new.</span>'; return; }
+    host.innerHTML = "";
+    anns.forEach(function (a) {
+      var el = document.createElement("div");
+      el.className = "feed-item";
+      el.innerHTML = "<div style=\"font-weight:700;font-size:.88rem\"></div><div class=\"muted\" style=\"font-size:.82rem\"></div>";
+      el.children[0].textContent = a.title;
+      el.children[1].textContent = a.body;
+      host.appendChild(el);
+    });
+  }
+})();
+</script>
+</body>
+</html>
