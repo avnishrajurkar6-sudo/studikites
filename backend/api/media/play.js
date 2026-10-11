@@ -3,12 +3,14 @@
    course's free-preview file (checked server-side). Playback keys are still
    minted client-side in smexgod and forwarded here. */
 const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
+const { verifySiteKey } = require("../../lib/siteauth");
 const { authorize } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["GET"])) return;
   try {
+    await verifySiteKey(req);
     const q = req.query || {};
     const courseId = /^[0-9]+$/.test(String(q.course_id || "")) ? String(q.course_id) : "";
     const contentId = /^[0-9]+$/.test(String(q.content_id || "")) ? String(q.content_id) : "";

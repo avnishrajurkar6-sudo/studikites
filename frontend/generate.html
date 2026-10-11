@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Study Helper — StudiKitEZ</title>
+<meta name="description" content="Solve doubts, explain topics, quiz yourself and make notes with StudiKitEZ AI." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .ai-msg { max-width: 46rem; }
+  .ai-out { white-space: pre-wrap; line-height: 1.65; font-size: 0.93rem; }
+  .ai-out code { font-family: var(--mono); font-size: 0.82em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 0.05rem 0.35rem; }
+  .typing span { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: var(--muted); animation: aibl 1s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes aibl { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .typing span { animation: none; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:50rem">
+  <div class="page-head anim-rise">
+    <span class="kicker">✨ AI study helper</span>
+    <h1>Ask anything.</h1>
+    <p>Doubts solved, topics explained, quizzes and crisp notes — Class 6–12, JEE/NEET.</p>
+  </div>
+
+  <div class="seg anim-rise" id="mode-seg" role="tablist" aria-label="AI mode" style="--d:.05s">
+    <button data-m="doubt" class="on">❓ Doubt</button>
+    <button data-m="explain">📖 Explain</button>
+    <button data-m="quiz">📝 Quiz me</button>
+    <button data-m="notes">🗒 Notes</button>
+  </div>
+
+  <div id="thread" class="ai-msg" style="display:flex;flex-direction:column;gap:.7rem;margin-top:1.1rem" aria-live="polite"></div>
+
+  <div class="panel anim-rise" style="margin-top:1rem;position:sticky;bottom:.75rem">
+    <div style="display:flex;gap:.5rem">
+      <textarea class="input" id="prompt" rows="2" maxlength="2000" placeholder="e.g. Why does ice float on water?" aria-label="Your question" style="flex:1;resize:vertical"></textarea>
+      <button class="btn btn-primary" id="ask" style="align-self:flex-end">Ask →</button>
+    </div>
+    <div class="row-head" style="margin-top:.5rem;justify-content:space-between">
+      <span class="mono muted" style="font-size:.65rem" id="cool"></span>
+      <button class="btn btn-ghost btn-sm" id="clear-hist">Clear chat</button>
+    </div>
+  </div>
+
+  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <a href="contact.html" style="font-size:.85rem">Contact</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/ads.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, api = SK.api, fb = SK.fb;
+  var user = null, mode = "doubt", busy = false, lastAsk = 0;
+  var hist = [];
+  try { hist = JSON.parse(sessionStorage.getItem("sk_ai_hist") || "[]") || []; } catch (e) { hist = []; }
+
+  ui.boot({ login: true, status: "Opening AI helper…" }).then(function (r) {
+    user = r.user;
+    ui.nav(); ui.telegramNag(); ui.authArea();
+    paintHistory();
+    SK.ads.render();
+  }).catch(function () {});
+
+  document.querySelectorAll("#mode-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#mode-seg button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      mode = b.dataset.m;
+    });
+  });
+
+  function bubble(who, html) {
+    var host = document.getElementById("thread");
+    var el = document.createElement("div");
+    el.className = "row-card anim-rise ai-msg";
+    el.innerHTML = '<div class="row-head"><span class="ava' + (who === "ai" ? " admin" : "") + '">' + (who === "ai" ? "✨" : "Y") + '</span><span class="chip' + (who === "ai" ? " adm" : "") + '">' + (who === "ai" ? "AI" : "You") + "</span></div>" + '<div class="ai-out" style="margin-top:.6rem"></div>';
+    el.querySelector(".ai-out").textContent = html;
+    host.appendChild(el);
+    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return el;
+  }
+  function paintHistory() {
+    document.getElementById("thread").innerHTML = "";
+    hist.slice(-10).forEach(function (m) { bubble(m.role === "assistant" ? "ai" : "you", m.content); });
+  }
+  document.getElementById("clear-hist").addEventListener("click", function () {
+    hist = [];
+    try { sessionStorage.removeItem("sk_ai_hist"); } catch (e) {}
+    paintHistory();
+  });
+
+  function saveHist() {
+    try { sessionStorage.setItem("sk_ai_hist", JSON.stringify(hist.slice(-12))); } catch (e) {}
+  }
+
+  async function ask() {
+    if (busy) return;
+    var input = document.getElementById("prompt");
+    var text = input.value.trim();
+    if (!text) return;
+    if (Date.now() - lastAsk < 8000) {
+      document.getElementById("cool").textContent = "slow down — one question every 8s";
+      return;
+    }
+    lastAsk = Date.now();
+    document.getElementById("cool").textContent = "";
+    busy = true;
+    document.getElementById("ask").disabled = true;
+    bubble("you", text);
+    hist.push({ role: "user", content: text });
+    input.value = "";
+    var host = document.getElementById("thread");
+    var wait = document.createElement("div");
+    wait.className = "row-card anim-rise";
+    wait.innerHTML = '<div class="typing" aria-label="Thinking"><span></span><span></span><span></span></div>';
+    host.appendChild(wait);
+    wait.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    try {
+      var headers = await fb.authHeaders().catch(function () { return {}; });
+      var reply = await api.aiChat(text, mode, hist.slice(0, -1).slice(-6), headers);
+      hist.push({ role: "assistant", content: reply });
+      saveHist();
+      wait.remove();
+      bubble("ai", reply);
+    } catch (e) {
+      wait.remove();
+      ui.toast("AI failed", (e && e.message) || "Try again in a bit");
+    }
+    busy = false;
+    document.getElementById("ask").disabled = false;
+  }
+  document.getElementById("ask").addEventListener("click", ask);
+  document.getElementById("prompt").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
+  });
+})();
+</script>
+</body>
+</html>

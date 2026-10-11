@@ -100,6 +100,7 @@
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
+  ui.boot({ status: "Loading app…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
   var ref = qp("ref");

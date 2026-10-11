@@ -11,6 +11,15 @@ window.SK.api = (function () {
       var qs = new URLSearchParams(opts.params).toString();
       if (qs) url += (url.indexOf("?") >= 0 ? "&" : "?") + qs;
     }
+    /* Strict source verification: every backend call (except the public
+       config/diag endpoints) carries our per-domain site key. */
+    var extra = {};
+    if (path !== "/api/config" && path !== "/api/diag") {
+      try {
+        var c = await getConfig();
+        if (c && c.SITE_KEY) extra["x-sk-sitekey"] = c.SITE_KEY;
+      } catch (e) {}
+    }
     var c = new AbortController();
     var timer = setTimeout(function () { c.abort(); }, opts.timeout || 20000);
     try {
@@ -19,6 +28,7 @@ window.SK.api = (function () {
         headers: Object.assign(
           { Accept: "application/json" },
           opts.body ? { "Content-Type": "application/json" } : {},
+          extra,
           opts.headers || {}
         ),
         body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -78,6 +88,13 @@ window.SK.api = (function () {
   }
   function sendOtp(mobile, deviceId) { return req("POST", "/api/auth/send-otp", { body: { mobile: mobile, deviceId: deviceId } }); }
   function verifyOtp(mobile, otp, deviceId) { return req("POST", "/api/auth/verify-otp", { body: { mobile: mobile, otp: otp, deviceId: deviceId } }); }
+  function aiChat(prompt, mode, history, headers) {
+    return req("POST", "/api/ai/chat", { body: { prompt: prompt, mode: mode, history: history || [] }, headers: headers, timeout: 30000 })
+      .then(function (j) {
+        if (!j.reply) throw new Error(j.error || "AI gave no answer");
+        return j.reply;
+      });
+  }
 
   /* Free preview: first file at root, else first file one folder down. */
   async function freePreviewId(courseId) {
@@ -133,5 +150,5 @@ window.SK.api = (function () {
     } catch (e) { return []; }
   }
 
-  return { getConfig: getConfig, catalog: catalog, allBatches: allBatches, content: content, play: play, live: live, sendOtp: sendOtp, verifyOtp: verifyOtp, freePreviewId: freePreviewId, isFreePreview: isFreePreview, deviceId: deviceId, validMobile: validMobile, fmtDur: fmtDur, parseLinks: parseLinks };
+  return { getConfig: getConfig, catalog: catalog, allBatches: allBatches, content: content, play: play, live: live, sendOtp: sendOtp, verifyOtp: verifyOtp, aiChat: aiChat, freePreviewId: freePreviewId, isFreePreview: isFreePreview, deviceId: deviceId, validMobile: validMobile, fmtDur: fmtDur, parseLinks: parseLinks };
 })();

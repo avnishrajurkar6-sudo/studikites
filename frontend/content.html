@@ -102,6 +102,7 @@
   var courseId = qp("id") || "";
   var pathIds = (qp("path") || "").split("/").filter(Boolean);
   var items = [], titles = new Map(), liveTab = "1", user = null, info = { title: "Course " + courseId, thumbnail: "" };
+  ui.boot({ status: "Opening course…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
 
   try { titles = new Map(JSON.parse(sessionStorage.getItem("sk_titles_" + courseId) || "[]")); } catch (e) {}

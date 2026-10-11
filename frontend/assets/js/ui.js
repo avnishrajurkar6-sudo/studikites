@@ -32,7 +32,7 @@ window.SK.ui = (function () {
     try { window.SK.fb.presenceBeat(); } catch (e) {}
     watchForce();
   }
-  /* Inject Posts (everyone) + Messages (signed-in) + Admin (admins) into both navs. */
+  /* Inject Posts (everyone) + Messages/Generate (signed-in) + Admin (admins). */
   function injectLinks() {
     [".nav-links", "#mobile-menu"].forEach(function (sel) {
       var host = document.querySelector(sel);
@@ -42,8 +42,10 @@ window.SK.ui = (function () {
       posts.href = "posts.html"; posts.textContent = "Posts";
       var msgs = document.createElement("a");
       msgs.href = "msgs.html"; msgs.textContent = "Messages";
-      if (anchor) { host.insertBefore(posts, anchor.nextSibling); host.insertBefore(msgs, posts.nextSibling); }
-      else { host.appendChild(posts); host.appendChild(msgs); }
+      var gen = document.createElement("a");
+      gen.href = "generate.html"; gen.textContent = "✨ AI";
+      if (anchor) { host.insertBefore(posts, anchor.nextSibling); host.insertBefore(msgs, posts.nextSibling); host.insertBefore(gen, msgs.nextSibling); }
+      else { host.appendChild(posts); host.appendChild(msgs); host.appendChild(gen); }
     });
     window.SK.fb.currentUser().then(function (u) {
       if (!u) return;
@@ -58,14 +60,30 @@ window.SK.ui = (function () {
       });
     }).catch(function () {});
   }
-  /* Guests never see Dashboard / Focus / Messages links anywhere. */
+  /* Guests never see Dashboard / Focus / Messages / AI links anywhere. */
   function gateNav() {
     window.SK.fb.currentUser().then(function (u) {
+      rewriteTelegramLinks(u);
       if (u) return;
-      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"], a[href="msgs.html"]').forEach(function (a) {
+      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"], a[href="msgs.html"], a[href="generate.html"]').forEach(function (a) {
         a.style.display = "none";
       });
     }).catch(function () {});
+  }
+  /* Every Telegram link on the site points at the bot. Logged-in users get a
+     deep link so the bot knows them: /vme {userid} via ?start=vme_{userid}. */
+  function botUrl(u) {
+    var base = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/Studikitesbot";
+    if (!u || !u.uid) return base;
+    var tag = "vme_" + String(u.uid).replace(/[^A-Za-z0-9_]/g, "").slice(0, 48);
+    return base.replace(/\/+$/, "") + "?start=" + tag;
+  }
+  function rewriteTelegramLinks(u) {
+    var url = botUrl(u);
+    if (window.__SK__) window.__SK__.telegramUrl = url;
+    document.querySelectorAll('a[href*="t.me/"]').forEach(function (a) {
+      try { a.href = url; } catch (e) {}
+    });
   }
   /* Force-message relay: if an admin has an active force msg for this user,
      every page bounces them to forcemsg.html until released. */
@@ -115,7 +133,7 @@ window.SK.ui = (function () {
     if (dismissed) return;
     setTimeout(function () {
       if (document.querySelector(".modal-card")) { setTimeout(telegramNag, 6000); return; }
-      var url = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/studikitez";
+      var url = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/Studikitesbot";
       var m = modal(
         '<span class="kicker">Stay updated</span><h3 style="margin:.5rem 0 .35rem">Join our Telegram</h3>' +
         '<p class="muted" style="margin:0;font-size:.95rem;line-height:1.55">New batches, live classes and exam alerts — pushed instantly to the channel.</p>' +
@@ -145,6 +163,63 @@ window.SK.ui = (function () {
     if (modalHost && modalHost.parentNode) modalHost.remove();
     modalHost = null;
   }
+  /* Full-screen boot splash (brand pulse + shimmer bar — never a spinner).
+     Every page shows this FIRST and reveals content only after the user,
+     ban state, subscription and (for admin pages) role are all verified,
+     so gated skeletons never flash for a split second. */
+  var booted = false, splashTimer = null;
+  function splash(show, status) {
+    var el = document.getElementById("boot-splash");
+    if (show) {
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "boot-splash";
+        el.setAttribute("aria-hidden", "true");
+        el.innerHTML = '<div class="splash-card"><span class="splash-mark">S</span>' +
+          '<div class="splash-name">StudiKitEZ</div>' +
+          '<div class="splash-bar"><span></span></div>' +
+          '<div class="splash-status mono"></div></div>';
+        document.body.appendChild(el);
+      }
+      el.classList.add("on");
+      var st = el.querySelector(".splash-status");
+      if (st && status) st.textContent = status;
+      if (splashTimer) clearTimeout(splashTimer);
+      splashTimer = setTimeout(function () { splash(false); }, 20000);
+      return;
+    }
+    if (splashTimer) { clearTimeout(splashTimer); splashTimer = null; }
+    if (el) el.classList.remove("on");
+    booted = true;
+  }
+  function reveal() { splash(false); }
+  /* opts: { login, admin, status } — resolves after verification. */
+  async function boot(opts) {
+    opts = opts || {};
+    splash(true, opts.status || "Verifying your session…");
+    var user = null, adFree = false, admin = false;
+    try { user = await window.SK.fb.currentUser(); } catch (e) { user = null; }
+    if (!user && opts.login) {
+      location.href = "login.html?next=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
+      throw new Error("redirect-login");
+    }
+    if (user) {
+      splash(true, "Checking account…");
+      try { await window.SK.fb.banCheck(user.uid); }
+      catch (e) {
+        if (String(e.message).indexOf("BANNED:") === 0) { location.href = "banned.html"; throw e; }
+        /* transient read failure: don't strand the user, continue */
+      }
+      if (opts.admin) {
+        splash(true, "Checking access…");
+        try { admin = await window.SK.fb.isAdmin(user.uid); } catch (e) { admin = false; }
+        if (!admin) { location.href = "404.html"; throw new Error("not-admin"); }
+      }
+      try { adFree = await window.SK.ads.adFree(); } catch (e) { adFree = false; }
+    }
+    splash(false);
+    return { user: user, adFree: adFree, admin: admin };
+  }
   /* Shared page boot: loader on, login check, ban check, ad-free check.
      strict=false redirects guests to login; strict pages pass allowGuest. */
   async function gatePage(opts) {
@@ -170,8 +245,8 @@ window.SK.ui = (function () {
     if (document.getElementById("tg-widget")) return;
     var w = document.createElement("div");
     w.className = "tg-widget"; w.id = "tg-widget";
-    w.innerHTML = '<span>Study updates on <a href="https://t.me/studikitez" target="_blank" rel="noopener">Telegram</a></span><button aria-label="Dismiss">×</button>';
-    w.querySelector("a").href = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/studikitez";
+    w.innerHTML = '<span>Study updates on <a href="https://t.me/Studikitesbot" target="_blank" rel="noopener">Telegram</a></span><button aria-label="Dismiss">×</button>';
+    w.querySelector("a").href = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/Studikitesbot";
     w.querySelector("button").addEventListener("click", function () { w.remove(); });
     document.body.appendChild(w);
   }
@@ -237,5 +312,5 @@ window.SK.ui = (function () {
     }
     requestAnimationFrame(step);
   }
-  return { esc: esc, toast: toast, nav: nav, gateNav: gateNav, gatePage: gatePage, telegram: telegram, telegramNag: telegramNag, announcePopup: announcePopup, modal: modal, closeModal: closeModal, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
+  return { esc: esc, toast: toast, nav: nav, gateNav: gateNav, gatePage: gatePage, boot: boot, reveal: reveal, botUrl: botUrl, telegram: telegram, telegramNag: telegramNag, announcePopup: announcePopup, modal: modal, closeModal: closeModal, authArea: authArea, skeleton: skeleton, load: load, countUp: countUp };
 })();

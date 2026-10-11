@@ -10,5 +10,5 @@
   } catch (e) { override = ""; }
   window.__SK__.backendBaseUrl = String(override || "").replace(/\/+$/, "");
   window.__SK__.batchesUrl = "batches.json";
-  window.__SK__.telegramUrl = "https://t.me/studikitez";
+  window.__SK__.telegramUrl = "https://t.me/Studikitesbot";
 })();

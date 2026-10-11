@@ -274,3 +274,54 @@ input[type="range"].vol { width: 84px; accent-color: var(--ink); cursor: pointer
   #top-loader.on, .hero-mark { animation: none; }
   .timer-wrap svg.ring .fg { transition: none; }
 }
+
+/* Boot splash: full-screen brand pulse + shimmer bar (no spinners). */
+#boot-splash { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+#boot-splash.on { opacity: 1; pointer-events: all; }
+.splash-card { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
+.splash-mark { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 22px; background: var(--ink); color: var(--bg); font-weight: 800; font-size: 1.9rem; animation: splashpulse 1.6s ease-in-out infinite; }
+@keyframes splashpulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(128,128,128,0.35); } 50% { transform: scale(1.06); box-shadow: 0 0 0 18px rgba(128,128,128,0); } }
+.splash-name { font-weight: 800; letter-spacing: -0.02em; font-size: 1.15rem; }
+.splash-bar { width: 11rem; height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; position: relative; }
+.splash-bar span { position: absolute; inset: 0; width: 40%; border-radius: 999px; background: var(--ink); animation: splashslide 1.1s ease-in-out infinite; }
+@keyframes splashslide { 0% { left: -40%; } 100% { left: 100%; } }
+.splash-status { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; min-height: 1rem; }
+@media (prefers-reduced-motion: reduce) {
+  .splash-mark, .splash-bar span { animation: none; }
+}
+
+/* Seek ripple (−10s / +10s) */
+.seek-flash { position: absolute; top: 50%; transform: translate(-50%, -50%); z-index: 5; font-family: var(--mono); font-weight: 700; font-size: 1rem; color: #fff; background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 0.45rem 0.9rem; pointer-events: none; animation: seekpop 0.7s ease-out both; }
+@keyframes seekpop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .seek-flash { animation: none; opacity: 0; } }
+
+/* Fullscreen: the real control bar moves INSIDE the stage; auto-hide on idle */
+.stage:fullscreen { border-radius: 0; }
+.stage:fullscreen video { max-height: 100vh; }
+.stage.in-fs .ctl { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(transparent, rgba(0,0,0,0.8)); border: 0; border-radius: 0; opacity: 1; transition: opacity 0.25s ease; }
+.stage.in-fs.idle .ctl { opacity: 0; pointer-events: none; }
+.stage.in-fs .ctl .iconbtn, .stage.in-fs .ctl .mono { color: #fff; }
+.stage.in-fs .ctl .iconbtn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+.stage.in-fs .vol { accent-color: #fff; }
+.stage.in-fs .seek .track { background: rgba(255,255,255,0.25); border-color: transparent; }
+.stage.in-fs .seek .fill { background: #fff; }
+.stage.in-fs .seek .knob { border-color: #fff; background: #fff; }
+
+/* Card hover lift + press feedback */
+.bcard, .row-card, .panel { transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.15s ease; }
+.bcard:hover { transform: translateY(-3px); }
+.btn:active { transform: scale(0.97); }
+.iconbtn { transition: transform 0.12s ease, background 0.15s ease; }
+.iconbtn:active { transform: scale(0.9); }
+
+/* PDF draw layer */
+.pdf-holder { position: relative; margin: 0 auto 0.75rem; }
+.pdf-holder canvas.pdf-page { display: block; }
+canvas.draw-layer { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+canvas.draw-layer.drawing { cursor: crosshair; }
+.draw-toolbar { position: sticky; top: 0; z-index: 5; }
+
+/* Toast entrance */
+.toast { animation: toastin 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes toastin { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

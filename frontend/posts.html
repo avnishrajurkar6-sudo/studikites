@@ -79,6 +79,7 @@
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
+  ui.boot({ status: "Loading community…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
   var F = null, db = null, me = null, isAdmin = false;
 

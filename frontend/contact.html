@@ -76,6 +76,7 @@
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
+  ui.boot({ status: "Loading…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
 
   fb.currentUser().then(function (u) {

@@ -74,6 +74,7 @@
 <script>
 (function () {
   var ui = SK.ui, grid = document.getElementById("grid"), q = document.getElementById("q"), all = [];
+  ui.boot({ status: "Loading catalog…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
   ui.announcePopup();
   SK.fb.announcements(8).then(function (list) {

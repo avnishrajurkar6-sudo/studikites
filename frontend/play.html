@@ -99,6 +99,7 @@
   var courseId = qp("course") || "", contentId = qp("content") || "", folderId = qp("folder") || "0";
   var user = null, play = null, hls = null;
   var video = document.getElementById("video");
+  ui.boot({ status: "Loading lecture…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
     location.href = "content.html?id=" + courseId + (folderId && folderId !== "0" ? "&path=" + folderId : "");
@@ -211,11 +212,66 @@
     if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
     else if (st.requestFullscreen) st.requestFullscreen().catch(function () {});
   });
+  /* Fullscreen: move the REAL control bar inside the stage so every button
+     works there; auto-hide on idle, show on any pointer move. */
+  var ctlEl = document.querySelector(".ctl"), ctlHome = ctlEl ? ctlEl.parentNode : null, ctlNext = ctlEl ? ctlEl.nextSibling : null, idleTimer = null;
+  function pokeControls() {
+    var st = document.getElementById("stage");
+    st.classList.remove("idle");
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      if (document.fullscreenElement) st.classList.add("idle");
+    }, 3000);
+  }
+  document.addEventListener("fullscreenchange", function () {
+    var st = document.getElementById("stage");
+    if (document.fullscreenElement === st) {
+      st.classList.add("in-fs");
+      if (ctlEl) st.appendChild(ctlEl);
+      pokeControls();
+      st.addEventListener("pointermove", pokeControls);
+    } else {
+      st.classList.remove("in-fs", "idle");
+      st.removeEventListener("pointermove", pokeControls);
+      if (ctlEl && ctlHome) ctlHome.insertBefore(ctlEl, ctlNext);
+      if (idleTimer) clearTimeout(idleTimer);
+    }
+  });
+  /* Double-click zones: left −10s, right +10s, center play/pause — with ripple. */
+  function flashSeek(text, xPct) {
+    var st = document.getElementById("stage");
+    var f = document.createElement("div");
+    f.className = "seek-flash";
+    f.style.left = xPct + "%";
+    f.textContent = text;
+    st.appendChild(f);
+    setTimeout(function () { f.remove(); }, 750);
+  }
+  function skipBy(sec, xPct) {
+    if (!video.duration) return;
+    video.currentTime = Math.min(Math.max(0, video.currentTime + sec), video.duration);
+    flashSeek((sec > 0 ? "+" : "−") + Math.abs(sec) + "s", xPct);
+  }
+  document.getElementById("stage").addEventListener("dblclick", function (e) {
+    if (video.style.display === "none") return;
+    if (e.target.closest && e.target.closest(".ctl, .seek-flash")) return;
+    var r = this.getBoundingClientRect();
+    var x = (e.clientX - r.left) / r.width;
+    if (x < 0.35) skipBy(-10, 22);
+    else if (x > 0.65) skipBy(10, 78);
+    else document.getElementById("play-btn").click();
+  });
   video.addEventListener("playing", function () { document.getElementById("veil").classList.add("hide"); });
   video.addEventListener("waiting", function () { document.getElementById("veil").classList.remove("hide"); });
   video.addEventListener("canplay", function () { document.getElementById("veil").classList.add("hide"); });
-  document.getElementById("stage").addEventListener("dblclick", function () {
-    document.getElementById("fs-btn").click();
+  document.getElementById("stage").addEventListener("dblclick", function (e) {
+    if (video.style.display === "none") return;
+    if (e.target.closest && e.target.closest(".ctl, .seek-flash")) return;
+    var r = this.getBoundingClientRect();
+    var x = (e.clientX - r.left) / r.width;
+    if (x < 0.35) skipBy(-10, 22);
+    else if (x > 0.65) skipBy(10, 78);
+    else document.getElementById("play-btn").click();
   });
   function seekTo(clientX) {
     var r = document.getElementById("seek").getBoundingClientRect();
@@ -308,18 +364,49 @@
     }
   });
   paintVol();
-  document.getElementById("dl-btn").addEventListener("click", function () {
+  document.getElementById("dl-btn").addEventListener("click", async function () {
+    var btn = this;
     var links = api.parseLinks(play), url = (links[0] && links[0].url) || (play && play.file_url);
     if (!url) { ui.toast("Nothing to download", ""); return; }
-    var a = document.createElement("a");
-    a.href = url; a.target = "_blank"; a.rel = "noopener"; a.download = (play.title || "lecture") + ".mp4";
-    document.body.appendChild(a); a.click(); a.remove();
+    if (/youtube\.com|youtu\.be|^[A-Za-z0-9_-]{11}$/.test(url)) { ui.toast("Download unavailable", "YouTube lectures can't be downloaded"); return; }
+    if (/\.m3u8($|\?)/i.test(url) && !links.length) { ui.toast("Stream only", "This lecture has no downloadable file"); return; }
+    /* Same-site download: fetch through OUR page (auth headers attached),
+       save the blob — no redirect, no new tab. Falls back to direct link. */
+    btn.disabled = true;
+    var old = btn.textContent; btn.textContent = "Preparing…";
+    try {
+      var headers = await fb.authHeaders().catch(function () { return {}; });
+      var c = new AbortController();
+      var timer = setTimeout(function () { c.abort(); }, 60000);
+      var res = await fetch(url, { headers: headers, signal: c.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var blob = await res.blob();
+      var ext = /\.mp4/i.test(url) ? ".mp4" : (/\.pdf/i.test(url) ? ".pdf" : ".mp4");
+      var name = String((play && play.title) || "lecture").replace(/[\\/:*?"<>|]/g, "").slice(0, 80) + ext;
+      var obj = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = obj; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(obj); }, 5000);
+      btn.textContent = "Saved ✓";
+      ui.toast("Downloaded", name);
+    } catch (e) {
+      var a2 = document.createElement("a");
+      a2.href = url; a2.target = "_blank"; a2.rel = "noopener"; a2.download = (play.title || "lecture") + ".mp4";
+      document.body.appendChild(a2); a2.click(); a2.remove();
+      ui.toast("Direct link opened", "Site download blocked by the file host");
+    }
+    btn.disabled = false;
+    setTimeout(function () { btn.textContent = old; }, 2500);
   });
   document.addEventListener("keydown", function (e) {
     if (/INPUT|TEXTAREA/.test(e.target.tagName) || video.style.display === "none") return;
     if (e.code === "Space") { e.preventDefault(); document.getElementById("play-btn").click(); }
     if (e.code === "ArrowRight") video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
     if (e.code === "ArrowLeft") video.currentTime = Math.max(0, video.currentTime - 10);
+    if (e.code === "KeyF") document.getElementById("fs-btn").click();
+    if (e.code === "KeyM") document.getElementById("mute-btn").click();
   });
 
   async function loadUpNext() {

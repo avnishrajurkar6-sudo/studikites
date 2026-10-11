@@ -109,6 +109,7 @@
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
+  ui.boot({ login: true, status: "Joining focus…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   var user = null;
   ui.load(true);

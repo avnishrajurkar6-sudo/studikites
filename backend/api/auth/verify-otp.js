@@ -1,10 +1,12 @@
 const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId } = require("../../lib/http");
+const { verifySiteKey } = require("../../lib/siteauth");
 const { mintSession } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["POST"])) return;
   try {
+    await verifySiteKey(req);
     const body = await readJsonBody(req);
     const mobile = validIndianMobile(body.mobile);
     const otp = String(body.otp || "").trim();

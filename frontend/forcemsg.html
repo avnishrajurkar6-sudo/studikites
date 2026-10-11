@@ -49,6 +49,7 @@
   var user = null, released = false, backTo = null;
   try { backTo = sessionStorage.getItem("sk_force_back") || "dashboard.html"; } catch (e) {}
 
+  ui.boot({ login: true, status: "Checking message…" }).catch(function () {});
   ui.load(true);
   fb.currentUser().then(function (u) {
     if (!u) { location.href = "login.html?next=forcemsg.html"; throw new Error("login"); }

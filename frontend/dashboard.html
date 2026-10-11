@@ -102,6 +102,7 @@
 <script>
 (function () {
   var ui = SK.ui, api = SK.api, fb = SK.fb;
+  ui.boot({ login: true, status: "Opening dashboard…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   function dayKey(d) { d = d || new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function heatmap() {
