@@ -29,10 +29,11 @@ window.SK.ui = (function () {
     }
     injectLinks();
     gateNav();
+    aiWidget();
     try { window.SK.fb.presenceBeat(); } catch (e) {}
     watchForce();
   }
-  /* Inject Posts (everyone) + Messages/Generate (signed-in) + Admin (admins). */
+  /* Inject Posts (everyone) + Messages (signed-in) + Admin (admins). */
   function injectLinks() {
     [".nav-links", "#mobile-menu"].forEach(function (sel) {
       var host = document.querySelector(sel);
@@ -42,10 +43,8 @@ window.SK.ui = (function () {
       posts.href = "posts.html"; posts.textContent = "Posts";
       var msgs = document.createElement("a");
       msgs.href = "msgs.html"; msgs.textContent = "Messages";
-      var gen = document.createElement("a");
-      gen.href = "generate.html"; gen.textContent = "✨ AI";
-      if (anchor) { host.insertBefore(posts, anchor.nextSibling); host.insertBefore(msgs, posts.nextSibling); host.insertBefore(gen, msgs.nextSibling); }
-      else { host.appendChild(posts); host.appendChild(msgs); host.appendChild(gen); }
+      if (anchor) { host.insertBefore(posts, anchor.nextSibling); host.insertBefore(msgs, posts.nextSibling); }
+      else { host.appendChild(posts); host.appendChild(msgs); }
     });
     window.SK.fb.currentUser().then(function (u) {
       if (!u) return;
@@ -65,7 +64,7 @@ window.SK.ui = (function () {
     window.SK.fb.currentUser().then(function (u) {
       rewriteTelegramLinks(u);
       if (u) return;
-      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"], a[href="msgs.html"], a[href="generate.html"]').forEach(function (a) {
+      document.querySelectorAll('a[href="dashboard.html"], a[href="focus.html"], a[href="msgs.html"]').forEach(function (a) {
         a.style.display = "none";
       });
     }).catch(function () {});
@@ -84,6 +83,122 @@ window.SK.ui = (function () {
     document.querySelectorAll('a[href*="t.me/"]').forEach(function (a) {
       try { a.href = url; } catch (e) {}
     });
+  }
+  /* Floating AI assistant — hovers on every page, answers site + study queries,
+     summarizes the current topic/video/PDF. Sign-in required to ask. */
+  var aiS = { mode: "doubt", busy: false, lastAsk: 0, hist: [], user: null };
+  function aiWidget() {
+    if (document.getElementById("ai-bubble")) return;
+    var b = document.createElement("button");
+    b.id = "ai-bubble"; b.setAttribute("aria-label", "Ask StudiKitEZ AI"); b.textContent = "✨";
+    b.addEventListener("click", function () { toggleAiPanel(); });
+    document.body.appendChild(b);
+    window.SK.fb.currentUser().then(function (u) { aiS.user = u || null; }).catch(function () {});
+  }
+  function aiContext() {
+    var page = "";
+    try { page = location.pathname.split("/").pop() + location.search; } catch (e) {}
+    return { page: page.slice(0, 80), title: String(document.title || "").slice(0, 120) };
+  }
+  function toggleAiPanel(force) {
+    var p = document.getElementById("ai-panel");
+    if (!p) {
+      p = document.createElement("div");
+      p.id = "ai-panel";
+      p.className = "panel";
+      p.setAttribute("role", "dialog");
+      p.setAttribute("aria-label", "StudiKitEZ AI");
+      p.innerHTML =
+        '<div class="row-head" style="justify-content:space-between;margin-bottom:.5rem">' +
+          '<span class="kicker" style="margin:0">✨ Ask AI</span>' +
+          '<button class="btn btn-ghost btn-sm" id="ai-x" aria-label="Close">×</button></div>' +
+        '<div class="seg" id="ai-modes" style="flex-wrap:wrap">' +
+          '<button data-m="doubt" class="on">Doubt</button>' +
+          '<button data-m="explain">Explain</button>' +
+          '<button data-m="quiz">Quiz</button>' +
+          '<button data-m="notes">Notes</button>' +
+          '<button data-m="summarize">Summarize</button></div>' +
+        '<div id="ai-thread" style="margin-top:.6rem"></div>' +
+        '<div id="ai-guest" style="display:none;margin-top:.6rem"><p class="muted" style="font-size:.82rem;margin:0 0 .6rem">Sign in to ask the AI anything.</p>' +
+          '<a class="btn btn-primary btn-sm" id="ai-login">Sign in →</a></div>' +
+        '<div id="ai-box" style="margin-top:.6rem">' +
+          '<button class="btn btn-secondary btn-sm btn-block" id="ai-sum" style="margin-bottom:.45rem">📄 Summarize this page</button>' +
+          '<div style="display:flex;gap:.4rem"><input class="input" id="ai-in" maxlength="2000" placeholder="Ask anything…" aria-label="Ask AI" style="flex:1;font-size:.85rem" />' +
+          '<button class="btn btn-primary btn-sm" id="ai-send" aria-label="Send">➤</button></div></div>';
+      document.body.appendChild(p);
+      p.querySelector("#ai-x").addEventListener("click", function () { p.classList.remove("open"); });
+      p.querySelectorAll("#ai-modes button").forEach(function (x) {
+        x.addEventListener("click", function () {
+          p.querySelectorAll("#ai-modes button").forEach(function (y) { y.classList.toggle("on", y === x); });
+          aiS.mode = x.dataset.m;
+        });
+      });
+      p.querySelector("#ai-send").addEventListener("click", function () { aiAsk(); });
+      p.querySelector("#ai-in").addEventListener("keydown", function (e) { if (e.key === "Enter") aiAsk(); });
+      p.querySelector("#ai-sum").addEventListener("click", function () { aiAsk(true); });
+      var gl = p.querySelector("#ai-login");
+      if (gl) gl.href = "login.html?next=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
+    }
+    var show = force !== undefined ? force : !p.classList.contains("open");
+    p.classList.toggle("open", show);
+    if (show) {
+      var has = !!aiS.user;
+      p.querySelector("#ai-guest").style.display = has ? "none" : "block";
+      p.querySelector("#ai-box").style.display = has ? "block" : "none";
+      if (!has) {
+        window.SK.fb.currentUser().then(function (u) {
+          aiS.user = u || null;
+          if (aiS.user) { p.querySelector("#ai-guest").style.display = "none"; p.querySelector("#ai-box").style.display = "block"; }
+        }).catch(function () {});
+      }
+      var inp = p.querySelector("#ai-in");
+      if (inp && has) inp.focus();
+    }
+  }
+  function aiBubble(who, text) {
+    var host = document.getElementById("ai-thread");
+    if (!host) return;
+    var el = document.createElement("div");
+    el.className = "chat-row" + (who === "you" ? " mine" : "");
+    el.innerHTML = '<div class="bubble"><span></span></div>';
+    el.querySelector("span").textContent = text;
+    host.appendChild(el);
+    host.scrollTop = host.scrollHeight;
+  }
+  async function aiAsk(summarize) {
+    if (aiS.busy) return;
+    if (!aiS.user) {
+      try { aiS.user = await window.SK.fb.currentUser(); } catch (e) { aiS.user = null; }
+      if (!aiS.user) { toggleAiPanel(true); toast("Sign in required", "Sign in to use the AI"); return; }
+    }
+    var inp = document.getElementById("ai-in");
+    var text = summarize ? ("Summarize this for me: " + (document.title || location.pathname)) : (inp ? inp.value.trim() : "");
+    if (!text) return;
+    if (Date.now() - aiS.lastAsk < 8000) { toast("Slow down", "One question every 8 seconds"); return; }
+    aiS.lastAsk = Date.now();
+    aiS.busy = true;
+    var mode = summarize ? "summarize" : aiS.mode;
+    aiBubble("you", text);
+    aiS.hist.push({ role: "user", content: text });
+    if (inp) inp.value = "";
+    var host = document.getElementById("ai-thread");
+    var wait = document.createElement("div");
+    wait.className = "chat-row";
+    wait.innerHTML = '<div class="bubble"><span class="ai-typing"><span></span><span></span><span></span></span></div>';
+    host.appendChild(wait);
+    host.scrollTop = host.scrollHeight;
+    try {
+      var headers = await window.SK.fb.authHeaders().catch(function () { return {}; });
+      var reply = await window.SK.api.aiChat(text, mode, aiS.hist.slice(0, -1).slice(-6), headers, aiContext());
+      aiS.hist.push({ role: "assistant", content: reply });
+      aiS.hist = aiS.hist.slice(-12);
+      wait.remove();
+      aiBubble("ai", reply);
+    } catch (e) {
+      wait.remove();
+      toast("AI failed", (e && e.message) || "Try again in a bit");
+    }
+    aiS.busy = false;
   }
   /* Force-message relay: if an admin has an active force msg for this user,
      every page bounces them to forcemsg.html until released. */
@@ -175,7 +290,12 @@ window.SK.ui = (function () {
         el = document.createElement("div");
         el.id = "boot-splash";
         el.setAttribute("aria-hidden", "true");
-        el.innerHTML = '<div class="splash-card"><span class="splash-mark">S</span>' +
+        el.innerHTML = '<div class="splash-card"><div class="bear" aria-hidden="true">' +
+          '<span class="ear l"></span><span class="ear r"></span>' +
+          '<span class="head"></span>' +
+          '<span class="eye l"></span><span class="eye r"></span>' +
+          '<span class="muzzle"></span>' +
+          '<span class="book"><span class="page"></span></span></div>' +
           '<div class="splash-name">StudiKitEZ</div>' +
           '<div class="splash-bar"><span></span></div>' +
           '<div class="splash-status mono"></div></div>';

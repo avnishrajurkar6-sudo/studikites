@@ -3,23 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AI Study Helper — StudiKitEZ</title>
-<meta name="description" content="Solve doubts, explain topics, quiz yourself and make notes with StudiKitEZ AI." />
+<title>Key Manager — StudiKitEZ</title>
+<meta name="robots" content="noindex, nofollow" />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
-<style>
-  .ai-msg { max-width: 46rem; }
-  .ai-out { white-space: pre-wrap; line-height: 1.65; font-size: 0.93rem; }
-  .ai-out code { font-family: var(--mono); font-size: 0.82em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 0.05rem 0.35rem; }
-  .typing span { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: var(--muted); animation: aibl 1s infinite; }
-  .typing span:nth-child(2) { animation-delay: 0.15s; }
-  .typing span:nth-child(3) { animation-delay: 0.3s; }
-  @keyframes aibl { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
-  @media (prefers-reduced-motion: reduce) { .typing span { animation: none; } }
-</style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -29,7 +19,6 @@
     <nav class="nav-links" aria-label="Primary">
       <a href="index.html">Catalog</a>
       <a href="dashboard.html">Dashboard</a>
-      <a href="focus.html">Focus Rooms</a>
       <a href="app.html">App</a>
     </nav>
     <span style="display:flex;align-items:center;gap:.5rem">
@@ -40,44 +29,59 @@
   <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
     <a href="index.html">Catalog</a>
     <a href="dashboard.html">Dashboard</a>
-    <a href="focus.html">Focus Rooms</a>
     <a href="app.html">App</a>
   </nav>
 </header>
 
-<main class="page" id="main"><div class="wrap" style="max-width:50rem">
+<main class="page" id="main"><div class="wrap" style="max-width:56rem">
   <div class="page-head anim-rise">
-    <span class="kicker">✨ AI study helper</span>
-    <h1>Ask anything.</h1>
-    <p>Doubts solved, topics explained, quizzes and crisp notes — Class 6–12, JEE/NEET.</p>
+    <span class="kicker">Admin only</span>
+    <h1>Key Manager</h1>
+    <p>Generate and manage playback keys. Format <span class="mono">SK-XXXX-XXXX</span>, 48h expiry.</p>
   </div>
 
-  <div class="seg anim-rise" id="mode-seg" role="tablist" aria-label="AI mode" style="--d:.05s">
-    <button data-m="doubt" class="on">❓ Doubt</button>
-    <button data-m="explain">📖 Explain</button>
-    <button data-m="quiz">📝 Quiz me</button>
-    <button data-m="notes">🗒 Notes</button>
-  </div>
-
-  <div id="thread" class="ai-msg" style="display:flex;flex-direction:column;gap:.7rem;margin-top:1.1rem" aria-live="polite"></div>
-
-  <div class="panel anim-rise" style="margin-top:1rem;position:sticky;bottom:.75rem">
-    <div style="display:flex;gap:.5rem">
-      <textarea class="input" id="prompt" rows="2" maxlength="2000" placeholder="e.g. Why does ice float on water?" aria-label="Your question" style="flex:1;resize:vertical"></textarea>
-      <button class="btn btn-primary" id="ask" style="align-self:flex-end">Ask →</button>
+  <section class="panel anim-rise" style="--d:.05s" aria-label="Generate key">
+    <div class="row-head" style="justify-content:space-between">
+      <span class="kicker" style="margin:0">Generate new key</span>
+      <span class="chip">48h expiry</span>
     </div>
-    <div class="row-head" style="margin-top:.5rem;justify-content:space-between">
-      <span class="mono muted" style="font-size:.65rem" id="cool"></span>
-      <button class="btn btn-ghost btn-sm" id="clear-hist">Clear chat</button>
+    <div style="display:flex;gap:.6rem;align-items:center;margin-top:.8rem;flex-wrap:wrap">
+      <button class="btn btn-primary" id="gen-btn">⚿ Generate Key</button>
+      <span class="mono muted" style="font-size:.68rem">Format SK-XXXX-XXXX · 1 device</span>
     </div>
-  </div>
+    <div class="row-card" id="keyout" style="display:none;margin-top:.9rem">
+      <div class="mono muted" style="font-size:.62rem;letter-spacing:.15em">GENERATED KEY</div>
+      <div class="mono" id="gen-key" style="font-size:1.15rem;font-weight:700;letter-spacing:.06em;margin:.25rem 0"></div>
+      <div class="mono muted" id="gen-exp" style="font-size:.7rem"></div>
+      <div class="act-bar"><button class="btn btn-secondary btn-sm" id="copy-btn">⧉ Copy</button></div>
+    </div>
+  </section>
 
-  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
+  <section class="panel anim-rise" style="--d:.1s;margin-top:1rem" aria-label="All keys">
+    <div class="row-head" style="justify-content:space-between">
+      <span class="kicker" style="margin:0">All keys <span id="key-count" class="muted"></span></span>
+      <div style="display:flex;gap:.4rem">
+        <input class="input" id="q" placeholder="Search keys…" style="font-size:.8rem;min-height:38px" />
+        <button class="btn btn-ghost btn-sm" id="reload-btn">Reload</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:.7rem">
+      <table class="tbl">
+        <thead><tr><th>Key</th><th>Created</th><th>Expires</th><th>Status</th><th>Devices</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" style="display:none;margin-top:.8rem"><h3>No keys yet</h3><p>Generate your first key above.</p></div>
+    <div style="text-align:center;margin-top:.6rem">
+      <button class="btn btn-ghost btn-sm" id="more-btn" style="display:none">Load more</button>
+      <p class="mono muted" style="font-size:.65rem" id="showing"></p>
+    </div>
+  </section>
 </div></main>
 
 <footer class="site-footer"><div class="wrap">
-  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
-  <a href="contact.html" style="font-size:.85rem">Contact</a>
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Admin route.</span>
+  <a href="index.html" style="font-size:.85rem">Home</a>
 </div></footer>
 
 <div id="toast-root" aria-live="polite"></div>
@@ -88,88 +92,90 @@
 <script src="assets/js/ads.js"></script>
 <script>
 (function () {
-  var ui = SK.ui, api = SK.api, fb = SK.fb;
-  var user = null, mode = "doubt", busy = false, lastAsk = 0;
-  var hist = [];
-  try { hist = JSON.parse(sessionStorage.getItem("sk_ai_hist") || "[]") || []; } catch (e) { hist = []; }
+  var ui = SK.ui, fb = SK.fb;
+  var F = null, gdb = null, keys = [], visible = 20, filter = "";
 
-  ui.boot({ login: true, status: "Opening AI helper…" }).then(function (r) {
-    user = r.user;
-    ui.nav(); ui.telegramNag(); ui.authArea();
-    paintHistory();
-    SK.ads.render();
+  ui.boot({ login: true, admin: true, status: "Checking key access…" }).then(function (r) {
+    var raw = fb.raw(); F = raw.S._fs; gdb = raw.S.gDb;
+    ui.nav(); ui.authArea();
+    load();
   }).catch(function () {});
 
-  document.querySelectorAll("#mode-seg button").forEach(function (b) {
-    b.addEventListener("click", function () {
-      document.querySelectorAll("#mode-seg button").forEach(function (x) { x.classList.toggle("on", x === b); });
-      mode = b.dataset.m;
+  function seg() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
+  function num(v) { return typeof v === "number" ? v : 0; }
+
+  function render() {
+    var q = filter.toLowerCase();
+    var list = q ? keys.filter(function (k) { return (k.key + " " + k.id).toLowerCase().indexOf(q) >= 0; }) : keys;
+    var show = list.slice(0, visible);
+    document.getElementById("key-count").textContent = "(" + list.length + ")";
+    document.getElementById("empty").style.display = list.length ? "none" : "block";
+    var tb = document.getElementById("rows");
+    tb.innerHTML = "";
+    show.forEach(function (k) {
+      var live = k.status === "active" && k.expiresAt > Date.now();
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td class='mono' style='font-weight:700'></td><td class='mono muted' style='font-size:.72rem'></td>" +
+        "<td class='mono muted' style='font-size:.72rem'></td><td></td><td class='mono' style='font-size:.75rem'></td>" +
+        "<td style='text-align:right'><button class='btn btn-ghost btn-sm'>Revoke</button></td>";
+      tr.children[0].textContent = k.key;
+      tr.children[1].textContent = new Date(k.createdAt).toLocaleDateString("en-IN");
+      tr.children[2].textContent = new Date(k.expiresAt).toLocaleDateString("en-IN");
+      tr.children[3].innerHTML = live ? '<span class="chip on">active</span>' : '<span class="chip bad">dead</span>';
+      tr.children[4].textContent = (k.registeredDevices || []).length + "/" + (k.maxDevices || 1);
+      tr.querySelector("button").addEventListener("click", function () {
+        if (!confirm("Revoke key " + k.key + "?")) return;
+        F.deleteDoc(F.doc(gdb, "valid_keys", k.id)).then(function () {
+          ui.toast("Revoked", "Key deleted"); load();
+        }).catch(function () { ui.toast("Revoke failed", "Try again"); });
+      });
+      tb.appendChild(tr);
     });
+    var more = document.getElementById("more-btn");
+    if (visible < list.length) { more.style.display = "inline-flex"; more.textContent = "Load more (" + (list.length - visible) + ")"; }
+    else more.style.display = "none";
+    document.getElementById("showing").textContent = list.length ? "Showing " + show.length + " of " + list.length : "";
+  }
+
+  function load() {
+    document.getElementById("rows").innerHTML = "<tr><td colspan='6' class='muted' style='text-align:center'>Loading…</td></tr>";
+    F.getDocs(F.query(F.collection(gdb, "valid_keys"), F.orderBy("createdAt", "desc"), F.limit(200))).then(function (snap) {
+      keys = [];
+      snap.forEach(function (d) {
+        var v = d.data() || {};
+        keys.push({ id: d.id, key: v.key || d.id, createdAt: num(v.createdAt), expiresAt: num(v.expiresAt), status: v.status || "active", maxDevices: v.maxDevices || 1, registeredDevices: v.registeredDevices || [] });
+      });
+      render();
+    }).catch(function () {
+      keys = []; render();
+      ui.toast("Failed to load", "Could not fetch keys");
+    });
+  }
+
+  document.getElementById("more-btn").addEventListener("click", function () { visible += 20; render(); });
+  document.getElementById("q").addEventListener("input", function () { filter = this.value; visible = 20; render(); });
+  document.getElementById("reload-btn").addEventListener("click", load);
+
+  document.getElementById("gen-btn").addEventListener("click", function () {
+    var btn = this;
+    btn.disabled = true; btn.textContent = "Generating…";
+    var key = "SK-" + seg() + "-" + seg();
+    var now = Date.now(), exp = now + 48 * 60 * 60 * 1000;
+    F.setDoc(F.doc(gdb, "valid_keys", key), {
+      key: key, createdAt: now, expiresAt: exp, status: "active", maxDevices: 1, registeredDevices: []
+    }).then(function () {
+      document.getElementById("keyout").style.display = "block";
+      document.getElementById("gen-key").textContent = key;
+      document.getElementById("gen-exp").textContent = "Expires: " + new Date(exp).toLocaleString("en-IN");
+      ui.toast("Key generated", key + " — valid 48 hours");
+      load();
+    }).catch(function () { ui.toast("Generation failed", "Try again"); })
+      .then(function () { btn.disabled = false; btn.textContent = "⚿ Generate Key"; });
   });
-
-  function bubble(who, html) {
-    var host = document.getElementById("thread");
-    var el = document.createElement("div");
-    el.className = "row-card anim-rise ai-msg";
-    el.innerHTML = '<div class="row-head"><span class="ava' + (who === "ai" ? " admin" : "") + '">' + (who === "ai" ? "✨" : "Y") + '</span><span class="chip' + (who === "ai" ? " adm" : "") + '">' + (who === "ai" ? "AI" : "You") + "</span></div>" + '<div class="ai-out" style="margin-top:.6rem"></div>';
-    el.querySelector(".ai-out").textContent = html;
-    host.appendChild(el);
-    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    return el;
-  }
-  function paintHistory() {
-    document.getElementById("thread").innerHTML = "";
-    hist.slice(-10).forEach(function (m) { bubble(m.role === "assistant" ? "ai" : "you", m.content); });
-  }
-  document.getElementById("clear-hist").addEventListener("click", function () {
-    hist = [];
-    try { sessionStorage.removeItem("sk_ai_hist"); } catch (e) {}
-    paintHistory();
-  });
-
-  function saveHist() {
-    try { sessionStorage.setItem("sk_ai_hist", JSON.stringify(hist.slice(-12))); } catch (e) {}
-  }
-
-  async function ask() {
-    if (busy) return;
-    var input = document.getElementById("prompt");
-    var text = input.value.trim();
-    if (!text) return;
-    if (Date.now() - lastAsk < 8000) {
-      document.getElementById("cool").textContent = "slow down — one question every 8s";
-      return;
-    }
-    lastAsk = Date.now();
-    document.getElementById("cool").textContent = "";
-    busy = true;
-    document.getElementById("ask").disabled = true;
-    bubble("you", text);
-    hist.push({ role: "user", content: text });
-    input.value = "";
-    var host = document.getElementById("thread");
-    var wait = document.createElement("div");
-    wait.className = "row-card anim-rise";
-    wait.innerHTML = '<div class="typing" aria-label="Thinking"><span></span><span></span><span></span></div>';
-    host.appendChild(wait);
-    wait.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    try {
-      var headers = await fb.authHeaders().catch(function () { return {}; });
-      var reply = await api.aiChat(text, mode, hist.slice(0, -1).slice(-6), headers);
-      hist.push({ role: "assistant", content: reply });
-      saveHist();
-      wait.remove();
-      bubble("ai", reply);
-    } catch (e) {
-      wait.remove();
-      ui.toast("AI failed", (e && e.message) || "Try again in a bit");
-    }
-    busy = false;
-    document.getElementById("ask").disabled = false;
-  }
-  document.getElementById("ask").addEventListener("click", ask);
-  document.getElementById("prompt").addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
+  document.getElementById("copy-btn").addEventListener("click", function () {
+    var t = document.getElementById("gen-key").textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { ui.toast("Copied", "Key copied to clipboard"); });
+    else prompt("Copy key:", t);
   });
 })();
 </script>
