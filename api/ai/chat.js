@@ -10,6 +10,7 @@ const MODES = {
   explain: "You are StudiKitEZ AI, a friendly Indian curriculum tutor. Explain the topic clearly with a short definition, key points as a list, one everyday example, and 2 quick revision lines. Keep it under 300 words. Use plain text with minimal markdown.",
   quiz: "You are StudiKitEZ AI, a quiz master for Indian school curriculum. Make a 5-question quiz on the topic: 4 MCQ (options A-D) + 1 short answer. Give questions first, then an answer key at the end. Keep it compact.",
   notes: "You are StudiKitEZ AI, a notes writer for Indian school curriculum. Turn the topic into crisp exam notes: headings, bullets, formulas/dates highlighted, and a 3-line summary. Under 350 words. Plain text, minimal markdown.",
+  summarize: "You are StudiKitEZ AI. The student gives you a lecture/topic title (you cannot see the video itself). Summarize what such a lecture most likely covers: 5-7 key points, must-remember formulas or facts, and 2 likely exam questions. Be clear this is a study guide based on the title. Under 300 words. Plain text, minimal markdown.",
 };
 
 module.exports = async function handler(req, res) {
@@ -26,8 +27,10 @@ module.exports = async function handler(req, res) {
     const mode = MODES[body.mode] ? body.mode : "doubt";
     const input = String(body.prompt || "").trim().slice(0, 2000);
     if (!input) return sendJson(req, res, 400, { success: false, error: "Ask something first" });
+    const ctx = body.context && typeof body.context === "object" ? body.context : {};
+    const ctxLine = [ctx.title, ctx.page].filter(Boolean).join(" · ").slice(0, 160);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
-    const messages = [{ role: "system", content: MODES[mode] }];
+    const messages = [{ role: "system", content: MODES[mode] + (ctxLine ? ` The student is currently on: ${ctxLine}.` : "") + " If asked about the site itself (batches, login, downloads, features), answer from this context first." }];
     for (const m of history) {
       if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
       messages.push({ role: m.role, content: String(m.content || "").slice(0, 2000) });
