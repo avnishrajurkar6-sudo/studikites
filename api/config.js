@@ -22,7 +22,7 @@ const DEFAULTS = {
     appId: "1:730581787323:web:934a0c33400c0b8c14bf9e",
     measurementId: "G-X0ZH9VYZ9B",
   },
-  SITE_URL: "https://studikites.vercel.app",
+    SITE_URL: "https://studikitesz.pages.dev",
   TELEGRAM_URL: "https://t.me/studikitez",
 };
 
@@ -54,6 +54,7 @@ module.exports = async function handler(req, res) {
       SITE_URL: pick(e.SITE_URL, DEFAULTS.SITE_URL),
       TELEGRAM_URL: pick(e.TELEGRAM_URL, DEFAULTS.TELEGRAM_URL),
       ADMIN_EMAILS: pick(e.ADMIN_EMAILS, ""),
+      SITE_KEY: pick(e.SITE_KEY, "sk-site-studikitesz-v1"),
       ADSENSE_CLIENT: pick(e.ADSENSE_CLIENT, "ca-pub-7694333485336687"),
       ADSENSE_SLOTS: {
         banner: pick(e.ADSENSE_SLOT_BANNER, "1840322518"),

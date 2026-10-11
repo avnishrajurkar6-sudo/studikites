@@ -1,6 +1,7 @@
 /* GET /api/courses/content?content=<batchId>&folder=<folderId>
    Stable backend route; vendor URLs stay in MEDIA_ROUTES_JSON/MIRROR_NIG_URL. */
 const { sendJson, sendOptions, requireMethod, mirrorNig, mediaRoutes, fetchUpstream } = require("../../lib/http");
+const { verifySiteKey } = require("../../lib/siteauth");
 
 function validId(value) {
   return /^[0-9]+$/.test(String(value || "")) ? String(value) : "";
@@ -10,6 +11,7 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["GET"])) return;
   try {
+    await verifySiteKey(req);
     const q = req.query || {};
     const content = validId(q.content);
     const folder = validId(q.folder || "0") || "0";
