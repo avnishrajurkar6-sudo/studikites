@@ -168,7 +168,8 @@ input[type="range"].vol { width: 84px; accent-color: var(--ink); cursor: pointer
 .qpill.on { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 700; }
 .qpill:hover:not(.on) { color: var(--ink); border-color: var(--muted); }
 .pdf-stage { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); max-height: 70vh; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-.pdf-stage canvas { background: #fff; border-radius: 6px; max-width: 100%; height: auto; box-shadow: var(--shadow); animation: imgin 0.4s both; }
+.pdf-stage canvas.pdf-page { background: #fff; border-radius: 6px; max-width: 100%; height: auto; box-shadow: var(--shadow); animation: imgin 0.4s both; }
+.pdf-stage canvas.draw-layer { background: transparent; box-shadow: none; animation: none; }
 .seg { display: inline-flex; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
 .seg button { border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 9px; min-height: 44px; transition: all 0.15s; }
 .seg button.on { background: var(--ink); color: var(--bg); }
@@ -275,9 +276,11 @@ input[type="range"].vol { width: 84px; accent-color: var(--ink); cursor: pointer
   .timer-wrap svg.ring .fg { transition: none; }
 }
 
-/* Boot splash: full-screen brand pulse + shimmer bar (no spinners). */
-#boot-splash { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
-#boot-splash.on { opacity: 1; pointer-events: all; }
+/* Boot splash: in-flow placeholder (header/footer stay visible, content hidden
+   until verification finishes — no full-page takeover). */
+#boot-splash { display: none; padding: 12vh 1rem 14vh; }
+body.booting #boot-splash { display: block; animation: rise 0.3s ease both; }
+body.booting main > *:not(#boot-splash) { display: none !important; }
 .splash-card { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
 .splash-mark { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 22px; background: var(--ink); color: var(--bg); font-weight: 800; font-size: 1.9rem; animation: splashpulse 1.6s ease-in-out infinite; }
 @keyframes splashpulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(128,128,128,0.35); } 50% { transform: scale(1.06); box-shadow: 0 0 0 18px rgba(128,128,128,0); } }
@@ -295,10 +298,10 @@ input[type="range"].vol { width: 84px; accent-color: var(--ink); cursor: pointer
 @keyframes beareye { 0%, 91%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
 .bear .muzzle { position: absolute; left: 50%; top: 1.62rem; transform: translateX(-50%); width: 1.25rem; height: 0.9rem; background: var(--bg); border-radius: 50%; opacity: 0.94; }
 .bear .muzzle::after { content: ""; position: absolute; left: 50%; top: 0.3rem; transform: translateX(-50%); width: 0.36rem; height: 0.26rem; background: var(--ink); border-radius: 50%; }
-.bear .book { position: absolute; left: 50%; bottom: -0.25rem; transform: translateX(-50%); width: 3.3rem; height: 2.05rem; perspective: 220px; }
-.bear .book::before { content: ""; position: absolute; inset: 0; background: var(--surface); border: 2px solid var(--ink); border-radius: 4px 9px 9px 4px; }
-.bear .page { position: absolute; left: 5px; top: 4px; bottom: 4px; width: calc(50% - 6px); background: var(--bg); border-right: 2px solid var(--ink); border-radius: 3px 0 0 3px; transform-origin: right center; animation: pageflip 2.4s ease-in-out infinite; }
-@keyframes pageflip { 0%, 18% { transform: rotateY(0deg); } 58%, 100% { transform: rotateY(-176deg); } }
+.bear .book { position: absolute; left: 50%; bottom: -0.2rem; transform: translateX(-50%); width: 3.3rem; height: 2.05rem; perspective: 220px; overflow: hidden; border: 2px solid var(--ink); border-radius: 4px 9px 9px 4px; background: var(--surface); }
+.bear .book::before { content: ""; position: absolute; left: 50%; top: 3px; bottom: 3px; width: 2px; transform: translateX(-50%); background: var(--ink); opacity: 0.5; }
+.bear .page { position: absolute; left: 3px; top: 3px; bottom: 3px; width: calc(50% - 4px); background: var(--bg); border-right: 2px solid var(--ink); border-radius: 2px 0 0 2px; transform-origin: right center; animation: pageflip 2.4s ease-in-out infinite; }
+@keyframes pageflip { 0%, 18% { transform: rotateY(0deg); } 58%, 100% { transform: rotateY(-165deg); } }
 @media (prefers-reduced-motion: reduce) {
   .bear, .bear .eye, .bear .page { animation: none; }
 }
@@ -342,19 +345,33 @@ canvas.draw-layer { position: absolute; inset: 0; width: 100%; height: 100%; tou
 canvas.draw-layer.drawing { cursor: crosshair; }
 .draw-toolbar { position: sticky; top: 0; z-index: 5; }
 
+/* Immersive reader: full-page continuous scroll, sticky bar */
+.wrap.wide { max-width: 76rem; }
+.pdf-bar { position: sticky; top: 0.6rem; z-index: 20; box-shadow: var(--shadow); }
+.pdf-stage.reading { max-height: none; overflow: visible; background: transparent; border: 0; padding: 0.5rem 0 0; gap: 0.9rem; }
+.pdf-stage.reading .pdf-holder { width: 100%; max-width: 54rem; }
+.pdf-stage.reading canvas.pdf-page { width: 100%; height: auto; }
+
 /* Toast entrance */
 .toast { animation: toastin 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes toastin { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
 /* Floating AI assistant */
-#ai-bubble { position: fixed; right: 1rem; bottom: 4.6rem; z-index: 80; width: 3.4rem; height: 3.4rem; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: 1.35rem; display: grid; place-items: center; border: 1px solid var(--ink); box-shadow: var(--shadow); cursor: pointer; transition: transform 0.15s ease; animation: aibob 3s ease-in-out infinite; }
+#ai-bubble { position: fixed; right: 1rem; bottom: 4.6rem; z-index: 80; width: 3.4rem; height: 3.4rem; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); cursor: pointer; transition: transform 0.15s ease; animation: aibob 3s ease-in-out infinite; overflow: hidden; padding: 0; }
 #ai-bubble:hover { transform: scale(1.08); }
+.bear.mini { display: block; margin: 0.1rem auto 0; transform: scale(0.52); transform-origin: center 30%; animation: none; }
+#ai-bubble:hover .bear.mini { animation: bearbob 2.4s ease-in-out infinite; }
 @keyframes aibob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 #ai-panel { position: fixed; right: 1rem; bottom: 8.5rem; z-index: 81; width: min(24rem, calc(100vw - 2rem)); max-height: 62vh; display: none; flex-direction: column; padding: 1rem; }
 #ai-panel.open { display: flex; animation: rise 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
 #ai-thread { overflow-y: auto; display: flex; flex-direction: column; gap: 0.45rem; max-height: 34vh; min-height: 6rem; }
 #ai-thread .bubble { font-size: 0.83rem; }
+/* Desktop: AI docks as a right sidebar */
+@media (min-width: 960px) {
+  #ai-panel.open { top: 4.2rem; bottom: 1rem; right: 1rem; max-height: none; }
+  #ai-thread { max-height: none; flex: 1; }
+}
 .ai-typing span { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: var(--muted); animation: aibl 1s infinite; }
 .ai-typing span:nth-child(2) { animation-delay: 0.15s; }
 .ai-typing span:nth-child(3) { animation-delay: 0.3s; }

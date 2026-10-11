@@ -22,7 +22,7 @@
   </div>
 </header>
 
-<main class="page" id="main"><div class="wrap">
+<main class="page" id="main"><div class="wrap wide">
   <span class="kicker">PDF notes</span>
   <h1 id="doc-title" style="font-size:clamp(1.2rem,3vw,1.6rem)">Loading…</h1>
 
@@ -33,23 +33,7 @@
     <span class="mono muted" style="font-size:.75rem;align-self:center" id="pdf-meta">— pages</span>
   </div>
 
-  <div class="ctl draw-toolbar" style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:.75rem">
-    <button class="qpill" id="draw-toggle" aria-pressed="false" title="Draw on pages">✏️ Draw</button>
-    <span id="draw-tools" style="display:none;gap:.4rem;align-items:center;flex-wrap:wrap">
-      <button class="qpill on" data-c="#111111" style="min-width:2.2rem" title="Black">●</button>
-      <button class="qpill" data-c="#c81e1e" style="min-width:2.2rem;color:#c81e1e" title="Red">●</button>
-      <button class="qpill" data-c="#1d4ed8" style="min-width:2.2rem;color:#1d4ed8" title="Blue">●</button>
-      <button class="qpill" data-w="2">Thin</button>
-      <button class="qpill on" data-w="4">Med</button>
-      <button class="qpill" data-w="7">Thick</button>
-      <button class="qpill" id="draw-clear" title="Erase this page">⌫ page</button>
-    </span>
-    <span class="mono muted" id="draw-hint" style="font-size:.65rem;display:none">drawings save on this device only</span>
-  </div>
-
-  <div class="pdf-stage" id="pdf-stage" aria-label="Document pages"><div class="spinner" role="status"></div></div>
-
-  <div class="ctl" style="border:1px solid var(--line);border-radius:var(--radius);margin-top:.75rem">
+  <div class="ctl pdf-bar" id="pdf-bar">
     <button class="iconbtn" id="pg-prev" aria-label="Previous page">‹</button>
     <input class="input mono" id="pg-input" value="1" inputmode="numeric" style="width:4rem;text-align:center" aria-label="Page number" />
     <span class="mono muted" style="font-size:.75rem">/ <span id="pg-total">—</span></span>
@@ -58,7 +42,20 @@
     <button class="iconbtn" id="zoom-out" aria-label="Zoom out">−</button>
     <button class="qpill" id="zoom-fit">Fit</button>
     <button class="iconbtn" id="zoom-in" aria-label="Zoom in">+</button>
+    <button class="qpill" id="draw-toggle" aria-pressed="false" title="Draw on pages">✏️</button>
+    <span id="draw-tools" style="display:none;gap:.35rem;align-items:center">
+      <button class="qpill on" data-c="#111111" title="Black">●</button>
+      <button class="qpill" data-c="#c81e1e" style="color:#c81e1e" title="Red">●</button>
+      <button class="qpill" data-c="#1d4ed8" style="color:#1d4ed8" title="Blue">●</button>
+      <button class="qpill on" data-w="4" title="Medium">M</button>
+      <button class="qpill" data-w="7" title="Thick">B</button>
+      <button class="qpill" id="draw-undo" title="Undo stroke">↩</button>
+      <button class="qpill" id="draw-clear" title="Erase this page">⌫</button>
+    </span>
   </div>
+  <div class="mono muted" id="draw-hint" style="font-size:.65rem;display:none;margin:.3rem 0 0">draw mode — annotations save on this device only</div>
+
+  <div class="pdf-stage reading" id="pdf-stage" aria-label="Document pages"><div class="spinner" role="status"></div></div>
 
   <section class="panel" style="margin-top:1rem">
     <h2 style="font-size:1rem">Page notes</h2>
@@ -181,7 +178,7 @@
     stage.innerHTML = "";
     rendered = {}; pageDims = {};
     document.getElementById("pg-total").textContent = pdf.numPages;
-    document.getElementById("pdf-meta").textContent = pdf.numPages + " pages";
+    document.getElementById("pdf-meta").textContent = pdf.numPages + " pages · " + Math.round(scale === null ? 100 : scale * 100) + "%";
     for (var p = 1; p <= pdf.numPages; p++) {
       var holder = document.createElement("div");
       holder.className = "pdf-holder"; holder.id = "pdf-page-" + p;
@@ -189,19 +186,26 @@
       var cv = document.createElement("canvas"); cv.className = "pdf-page"; holder.appendChild(cv);
       var ov = document.createElement("canvas"); ov.className = "draw-layer"; holder.appendChild(ov);
       var sk = document.createElement("div");
-      sk.className = "skel"; sk.style.cssText = "position:absolute;inset:0;border-radius:6px";
+      sk.className = "skel"; sk.style.cssText = "position:absolute;inset:0;border-radius:6px;min-height:12rem";
       holder.appendChild(sk);
       stage.appendChild(holder);
+      bindDraw(ov, p);
       (function (pgNum, el) {
         pdf.getPage(pgNum).then(function (pg) {
           var v0 = pg.getViewport({ scale: 1 });
           pageDims[pgNum] = { w: v0.width, h: v0.height };
           el.style.aspectRatio = v0.width + " / " + v0.height;
           io.observe(el);
-        }).catch(function () {});
+        }).catch(function () {
+          el.innerHTML = '<div class="empty" style="border:0"><p>Page ' + pgNum + " wouldn't render.</p></div>";
+        });
       })(p, holder);
     }
     document.getElementById("pg-input").value = page;
+    /* First pages render NOW (never blank), rest lazy-load on scroll. */
+    await renderPage(1);
+    if (pdf.numPages >= 2) renderPage(2);
+    if (pdf.numPages >= 3) renderPage(3);
   }
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (en) {
@@ -216,17 +220,22 @@
     var inp = document.getElementById("pg-input");
     if (inp && document.activeElement !== inp) inp.value = p;
   }
-  async function renderPage(p) {
+  async function renderPage(p, attempt) {
     var holder = document.getElementById("pdf-page-" + p);
     if (!holder || rendered[p] === scale) return;
+    var stageW = document.getElementById("pdf-stage").clientWidth;
+    if (!stageW && (attempt || 0) < 4) {
+      setTimeout(function () { renderPage(p, (attempt || 0) + 1); }, 300);
+      return;
+    }
     rendered[p] = scale;
     try {
       var pg = await pdf.getPage(p);
-      var s = scale === null ? fitScale(pg, document.getElementById("pdf-stage").clientWidth || 700) : scale;
+      var s = scale === null ? fitScale(pg, stageW || 700) : scale;
       var vp = pg.getViewport({ scale: s });
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
       var cv = holder.querySelector("canvas.pdf-page");
-      cv.width = vp.width * dpr; cv.height = vp.height * dpr;
+      cv.width = Math.round(vp.width * dpr); cv.height = Math.round(vp.height * dpr);
       cv.style.width = "100%"; cv.style.height = "auto";
       holder.style.aspectRatio = vp.width + " / " + vp.height;
       await pg.render({ canvasContext: cv.getContext("2d"), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined }).promise;
@@ -234,7 +243,15 @@
       if (sk) sk.remove();
       paintDraw(p);
       trackPage(p);
-    } catch (e) { rendered[p] = null; }
+    } catch (e) {
+      rendered[p] = null;
+      if (!holder.querySelector(".empty")) {
+        var err = document.createElement("div");
+        err.className = "empty"; err.style.border = "0";
+        err.innerHTML = "<p>Page " + p + " wouldn't render. Try zoom Fit.</p>";
+        holder.appendChild(err);
+      }
+    }
   }
   function rerenderVisible() {
     Object.keys(rendered).forEach(function (k) { rendered[k] = null; });
@@ -264,47 +281,95 @@
     });
     ov.classList.toggle("drawing", drawOn);
   }
+  /* ---- draw engine v2: live smooth strokes, undo, zoom-proof ---- */
+  function smoothStroke(ctx, pts, W, H) {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * W, pts[0][1] * H);
+    if (pts.length === 2) { ctx.lineTo(pts[1][0] * W, pts[1][1] * H); ctx.stroke(); return; }
+    for (var i = 1; i < pts.length - 1; i++) {
+      var xc = (pts[i][0] + pts[i + 1][0]) / 2 * W, yc = (pts[i][1] + pts[i + 1][1]) / 2 * H;
+      ctx.quadraticCurveTo(pts[i][0] * W, pts[i][1] * H, xc, yc);
+    }
+    var last = pts[pts.length - 1];
+    ctx.lineTo(last[0] * W, last[1] * H);
+    ctx.stroke();
+  }
+  function paintDraw(p) {
+    var holder = document.getElementById("pdf-page-" + p);
+    if (!holder) return;
+    var ov = holder.querySelector("canvas.draw-layer");
+    var base = holder.querySelector("canvas.pdf-page");
+    var W = base.clientWidth || holder.clientWidth || 0, H = base.clientHeight || 0;
+    if (W < 10 || H < 10) return;
+    if (ov.width !== Math.round(W) || ov.height !== Math.round(H)) {
+      ov.width = Math.round(W); ov.height = Math.round(H);
+    }
+    var ctx = ov.getContext("2d");
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    (drawData[p] || []).forEach(function (st) {
+      if (!st.pts || st.pts.length < 2) return;
+      ctx.strokeStyle = st.c || "#111111";
+      ctx.lineWidth = Math.max(1.2, (st.w || 4) * (ov.width / 800));
+      smoothStroke(ctx, st.pts, ov.width, ov.height);
+    });
+    ov.classList.toggle("drawing", drawOn);
+  }
   function bindDraw(ov, p) {
     if (ov._bound) return; ov._bound = true;
-    var stroke = null;
+    var stroke = null, ctx = ov.getContext("2d");
     function pos(e) {
       var r = ov.getBoundingClientRect();
       var cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
       var cy = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
       return [Math.min(1, Math.max(0, (cx - r.left) / r.width)), Math.min(1, Math.max(0, (cy - r.top) / r.height))];
     }
+    function setup() {
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = stroke.c;
+      ctx.lineWidth = Math.max(1.2, stroke.w * (ov.width / 800));
+    }
     function start(e) {
       if (!drawOn) return;
       e.preventDefault();
+      if (!ov.width) paintDraw(p);
       stroke = { c: drawColor, w: drawW, pts: [pos(e)] };
+      setup();
     }
     function move(e) {
       if (!stroke) return;
       e.preventDefault();
-      stroke.pts.push(pos(e));
+      var pt = pos(e), prev = stroke.pts[stroke.pts.length - 1];
+      var dx = (pt[0] - prev[0]) * ov.width, dy = (pt[1] - prev[1]) * ov.height;
+      if (dx * dx + dy * dy < 4) return;
+      /* live segment */
+      ctx.strokeStyle = stroke.c;
+      ctx.lineWidth = Math.max(1.2, stroke.w * (ov.width / 800));
+      ctx.beginPath();
+      ctx.moveTo(prev[0] * ov.width, prev[1] * ov.height);
+      ctx.lineTo(pt[0] * ov.width, pt[1] * ov.height);
+      ctx.stroke();
+      stroke.pts.push(pt);
     }
     function end() {
       if (!stroke) return;
-      if (!drawData[p]) drawData[p] = [];
-      if (stroke.pts.length > 1) drawData[p].push({ c: stroke.c, w: stroke.w, pts: stroke.pts });
+      if (stroke.pts.length > 1) {
+        if (!drawData[p]) drawData[p] = [];
+        drawData[p].push({ c: stroke.c, w: stroke.w, pts: stroke.pts });
+        saveDraw();
+        paintDraw(p);
+      }
       stroke = null;
-      saveDraw(); paintDraw(p);
     }
     ov.addEventListener("mousedown", start);
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", end);
+    ov.addEventListener("mouseleave", function () { if (stroke && stroke.pts.length < 2) stroke = null; });
     ov.addEventListener("touchstart", start, { passive: false });
     ov.addEventListener("touchmove", move, { passive: false });
     ov.addEventListener("touchend", end);
   }
-  var drawObs = new MutationObserver(function () {
-    document.querySelectorAll(".pdf-holder canvas.draw-layer").forEach(function (ov) {
-      var p = Number(ov.parentNode.dataset.page);
-      bindDraw(ov, p);
-      paintDraw(p);
-    });
-  });
-  drawObs.observe(document.getElementById("pdf-stage"), { childList: true, subtree: true });
   document.getElementById("draw-toggle").addEventListener("click", function () {
     drawOn = !drawOn;
     this.classList.toggle("on", drawOn);
@@ -325,6 +390,11 @@
       drawW = Number(b.dataset.w);
       document.querySelectorAll("#draw-tools [data-w]").forEach(function (x) { x.classList.toggle("on", x === b); });
     });
+  });
+  document.getElementById("draw-undo").addEventListener("click", function () {
+    var arr = drawData[page];
+    if (arr && arr.length) { arr.pop(); saveDraw(); paintDraw(page); }
+    else ui.toast("Nothing to undo", "");
   });
   document.getElementById("draw-clear").addEventListener("click", function () {
     delete drawData[page];

@@ -90,7 +90,8 @@ window.SK.ui = (function () {
   function aiWidget() {
     if (document.getElementById("ai-bubble")) return;
     var b = document.createElement("button");
-    b.id = "ai-bubble"; b.setAttribute("aria-label", "Ask StudiKitEZ AI"); b.textContent = "✨";
+    b.id = "ai-bubble"; b.setAttribute("aria-label", "Ask StudiKitEZ AI");
+    b.innerHTML = '<span class="bear mini" aria-hidden="true"><span class="ear l"></span><span class="ear r"></span><span class="head"></span><span class="eye l"></span><span class="eye r"></span><span class="muzzle"></span><span class="book"><span class="page"></span></span></span>';
     b.addEventListener("click", function () { toggleAiPanel(); });
     document.body.appendChild(b);
     window.SK.fb.currentUser().then(function (u) { aiS.user = u || null; }).catch(function () {});
@@ -115,7 +116,6 @@ window.SK.ui = (function () {
         '<div class="seg" id="ai-modes" style="flex-wrap:wrap">' +
           '<button data-m="doubt" class="on">Doubt</button>' +
           '<button data-m="explain">Explain</button>' +
-          '<button data-m="quiz">Quiz</button>' +
           '<button data-m="notes">Notes</button>' +
           '<button data-m="summarize">Summarize</button></div>' +
         '<div id="ai-thread" style="margin-top:.6rem"></div>' +
@@ -284,8 +284,9 @@ window.SK.ui = (function () {
      so gated skeletons never flash for a split second. */
   var booted = false, splashTimer = null;
   function splash(show, status) {
-    var el = document.getElementById("boot-splash");
     if (show) {
+      try { document.body.classList.add("booting"); } catch (e) {}
+      var el = document.getElementById("boot-splash");
       if (!el) {
         el = document.createElement("div");
         el.id = "boot-splash";
@@ -299,9 +300,9 @@ window.SK.ui = (function () {
           '<div class="splash-name">StudiKitEZ</div>' +
           '<div class="splash-bar"><span></span></div>' +
           '<div class="splash-status mono"></div></div>';
-        document.body.appendChild(el);
+        var main = document.querySelector("main");
+        if (main) main.prepend(el); else document.body.appendChild(el);
       }
-      el.classList.add("on");
       var st = el.querySelector(".splash-status");
       if (st && status) st.textContent = status;
       if (splashTimer) clearTimeout(splashTimer);
@@ -309,7 +310,9 @@ window.SK.ui = (function () {
       return;
     }
     if (splashTimer) { clearTimeout(splashTimer); splashTimer = null; }
-    if (el) el.classList.remove("on");
+    try { document.body.classList.remove("booting"); } catch (e) {}
+    var gone = document.getElementById("boot-splash");
+    if (gone) gone.remove();
     booted = true;
   }
   function reveal() { splash(false); }
