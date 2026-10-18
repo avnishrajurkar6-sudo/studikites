@@ -17,11 +17,11 @@ module.exports = async function handler(req, res) {
     const routes = mediaRoutes();
     const params = new URLSearchParams({ content, folder }).toString();
     const upstream = await fetchUpstream(`${routes.nig}?${params}`);
-    if (upstream.json) return sendJson(req, res, upstream.status, upstream.json);
+    if (upstream.ok && upstream.json) return sendJson(req, res, upstream.status, upstream.json);
     const mirror = mirrorNig();
     const fallback = await fetchUpstream(`${mirror}/?${params}`);
     if (fallback.json) return sendJson(req, res, fallback.status, fallback.json);
-    return sendJson(req, res, 502, { success: false, error: "Content API unreachable" });
+    return sendJson(req, res, upstream.status || 502, upstream.json || { success: false, error: "Content API unreachable" });
   } catch (err) {
     return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Content API unreachable" });
   }
