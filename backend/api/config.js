@@ -54,7 +54,6 @@ module.exports = async function handler(req, res) {
       SITE_URL: pick(e.SITE_URL, DEFAULTS.SITE_URL),
       TELEGRAM_URL: pick(e.TELEGRAM_URL, DEFAULTS.TELEGRAM_URL),
       ADMIN_EMAILS: pick(e.ADMIN_EMAILS, ""),
-      SITE_KEY: pick(e.SITE_KEY, "sk-site-studikitesz-v1"),
       ADSENSE_CLIENT: pick(e.ADSENSE_CLIENT, "ca-pub-7694333485336687"),
       ADSENSE_SLOTS: {
         banner: pick(e.ADSENSE_SLOT_BANNER, "1840322518"),

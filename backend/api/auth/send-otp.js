@@ -1,11 +1,9 @@
 const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId } = require("../../lib/http");
-const { verifySiteKey } = require("../../lib/siteauth");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["POST"])) return;
   try {
-    await verifySiteKey(req);
     const body = await readJsonBody(req);
     const mobile = validIndianMobile(body.mobile);
     if (!mobile) return sendJson(req, res, 400, { success: false, error: "Enter a valid 10-digit Indian mobile number" });

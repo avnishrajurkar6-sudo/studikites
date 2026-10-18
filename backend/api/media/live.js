@@ -2,14 +2,12 @@
    type: 1 = live, 0 = upcoming, 2 = completed.
    Needs a well-formed app key+device (minted client-side via smexgod anon auth). */
 const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
-const { verifySiteKey } = require("../../lib/siteauth");
 const { validAppKey } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["GET"])) return;
   try {
-    await verifySiteKey(req);
     const q = req.query || {};
     const courseId = /^[0-9]+$/.test(String(q.course_id || "")) ? String(q.course_id) : "";
     const type = ["0", "1", "2"].includes(String(q.type || "1")) ? String(q.type || "1") : "";

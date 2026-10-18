@@ -1,10 +1,13 @@
 /* Shared helpers for Vercel Node serverless functions (CommonJS, no deps). */
 
 function allowedOrigins() {
-  return String(process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim().replace(/\/+$/, ""))
-    .filter(Boolean);
+  const defaults = ["https://studikitesz.pages.dev", "https://studikites.vercel.app"];
+  return defaults.concat(
+    String(process.env.ALLOWED_ORIGINS || "")
+      .split(",")
+      .map((s) => s.trim().replace(/\/+$/, ""))
+      .filter(Boolean)
+  ).filter((v, i, a) => a.indexOf(v) === i);
 }
 
 function applyCors(req, res) {
@@ -17,7 +20,7 @@ function applyCors(req, res) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, x-sk-session, x-sk-sitekey");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, x-sk-session");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 

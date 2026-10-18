@@ -11,16 +11,6 @@ window.SK.api = (function () {
       var qs = new URLSearchParams(opts.params).toString();
       if (qs) url += (url.indexOf("?") >= 0 ? "&" : "?") + qs;
     }
-    /* Strict source verification: every backend call (except the public
-       config/diag endpoints) carries this domain's site key — resolved from
-       the Firestore registry first (admin-added keys), config fallback. */
-    var extra = {};
-    if (path !== "/api/config" && path !== "/api/diag") {
-      try {
-        var k = await siteKey();
-        if (k) extra["x-sk-sitekey"] = k;
-      } catch (e) {}
-    }
     var c = new AbortController();
     var timer = setTimeout(function () { c.abort(); }, opts.timeout || 20000);
     try {
@@ -29,7 +19,6 @@ window.SK.api = (function () {
         headers: Object.assign(
           { Accept: "application/json" },
           opts.body ? { "Content-Type": "application/json" } : {},
-          extra,
           opts.headers || {}
         ),
         body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -89,29 +78,6 @@ window.SK.api = (function () {
   }
   function sendOtp(mobile, deviceId) { return req("POST", "/api/auth/send-otp", { body: { mobile: mobile, deviceId: deviceId } }); }
   function verifyOtp(mobile, otp, deviceId) { return req("POST", "/api/auth/verify-otp", { body: { mobile: mobile, otp: otp, deviceId: deviceId } }); }
-  var siteKeyCache = {};
-  async function siteKey() {
-    var host = "";
-    try { host = location.hostname.toLowerCase(); } catch (e) {}
-    if (siteKeyCache[host] !== undefined) return siteKeyCache[host];
-    try {
-      var c = await getConfig();
-      var ak = c && c.STUDIKI && c.STUDIKI.apiKey;
-      if (host && ak) {
-        var r = await fetch("https://firestore.googleapis.com/v1/projects/studiki/databases/(default)/documents/api-keys/" + encodeURIComponent(host) + "?key=" + encodeURIComponent(ak));
-        if (r.ok) {
-          var j = await r.json();
-          var f = (j && j.fields) || {};
-          var sk = f.siteKey && f.siteKey.stringValue;
-          var active = !(f.active && f.active.booleanValue === false);
-          if (sk && active) { siteKeyCache[host] = sk; return sk; }
-        }
-      }
-      siteKeyCache[host] = (c && c.SITE_KEY) || "";
-      return siteKeyCache[host];
-    } catch (e) { siteKeyCache[host] = ""; return ""; }
-  }
-
   function aiChat(prompt, mode, history, headers, context) {
     return req("POST", "/api/ai/chat", { body: { prompt: prompt, mode: mode, history: history || [], context: context || {} }, headers: headers, timeout: 30000 })
       .then(function (j) {

@@ -2,7 +2,6 @@
    Strictly gated: verified request source (site key) + signed-in user.
    The xKiro key lives ONLY in env XKIRO_API_KEY — never in code, never shipped. */
 const { sendJson, sendOptions, requireMethod, readJsonBody, fetchUpstream } = require("../../lib/http");
-const { verifySiteKey } = require("../../lib/siteauth");
 const { authorize } = require("../../lib/verify");
 
 const MODES = {
@@ -17,7 +16,6 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["POST"])) return;
   try {
-    await verifySiteKey(req);
     const who = await authorize(req, {});
     const key = String(process.env.XKIRO_API_KEY || "").trim();
     if (!key) {

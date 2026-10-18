@@ -156,26 +156,6 @@
       </div>
       <div id="ref-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem"></div>
     </section>
-
-    <section class="panel span-12 anim-rise" aria-label="API keys">
-      <div class="row-head" style="justify-content:space-between">
-        <span class="kicker" style="margin:0">🔑 API keys — verified domains</span>
-        <button class="btn btn-ghost btn-sm" id="keys-reload">Reload</button>
-      </div>
-      <p class="muted" style="font-size:.8rem;margin:.4rem 0 .7rem">Backend accepts requests only when the browser's Origin domain AND its site key both match a row here. Our own domain uses the fixed key from backend env. Localhost always passes for development.</p>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <input class="input mono" id="key-domain" placeholder="domain — e.g. app.example.com" style="flex:2;min-width:12rem;font-size:.82rem" />
-        <input class="input mono" id="key-value" placeholder="site key (or Generate)" style="flex:2;min-width:12rem;font-size:.82rem" />
-        <button class="btn btn-secondary btn-sm" id="key-gen">Generate</button>
-        <button class="btn btn-primary btn-sm" id="key-add">Add domain</button>
-      </div>
-      <div class="tbl-wrap" style="margin-top:.7rem">
-        <table class="tbl">
-          <thead><tr><th>Domain</th><th>Site key</th><th>Status</th><th></th></tr></thead>
-          <tbody id="keys-rows"></tbody>
-        </table>
-      </div>
-    </section>
   </div>
 </div></main>
 
@@ -200,7 +180,7 @@
     me = r.user;
     var raw = fb.raw(); F = raw.S._fs; db = raw.S.sDb;
     ui.nav(); ui.authArea();
-    loadUsers(); loadAnns(); loadPresence(); loadMod(); loadInbox(); loadRefs(); loadVersions(); loadFeedback(); loadKeys();
+    loadUsers(); loadAnns(); loadPresence(); loadMod(); loadInbox(); loadRefs(); loadVersions(); loadFeedback();
     presenceTimer = setInterval(loadPresence, 8000);
   }).catch(function () {});
 
@@ -661,53 +641,6 @@
     }).catch(function () {});
   }
   document.getElementById("ref-reload").addEventListener("click", loadRefs);
-
-  /* ---------- API keys: verified domains ---------- */
-  function loadKeys() {
-    var tb = document.getElementById("keys-rows");
-    if (!tb || !F) return;
-    tb.innerHTML = "<tr><td colspan='4' class='muted'>Loading…</td></tr>";
-    F.getDocs(F.query(F.collection(db, "api-keys"), F.limit(50))).then(function (snap) {
-      tb.innerHTML = snap.empty ? "<tr><td colspan='4' class='muted'>No extra domains — only the fixed key + localhost pass.</td></tr>" : "";
-      snap.forEach(function (d) {
-        var v = d.data() || {};
-        var tr = document.createElement("tr");
-        tr.innerHTML = "<td class='mono'></td><td class='mono muted' style='font-size:.72rem'></td><td></td>" +
-          "<td><div style='display:flex;gap:.4rem'><button class='btn btn-ghost btn-sm' data-a='tog'></button><button class='btn btn-ghost btn-sm' data-a='del'>Delete</button></div></td>";
-        tr.children[0].textContent = d.id;
-        tr.children[1].textContent = String(v.siteKey || "").slice(0, 24) + "…";
-        var on = v.active !== false;
-        tr.children[2].innerHTML = on ? '<span class="chip on">active</span>' : '<span class="chip bad">off</span>';
-        tr.querySelector("[data-a='tog']").textContent = on ? "Disable" : "Enable";
-        tr.querySelector("[data-a='tog']").addEventListener("click", function () {
-          F.setDoc(F.doc(db, "api-keys", d.id), { active: !on }, { merge: true }).then(function () { loadKeys(); }).catch(function () { ui.toast("Failed", "Write denied"); });
-        });
-        tr.querySelector("[data-a='del']").addEventListener("click", function () {
-          if (!confirm("Remove API key for " + d.id + "?")) return;
-          F.deleteDoc(F.doc(db, "api-keys", d.id)).then(function () { loadKeys(); }).catch(function () { ui.toast("Failed", "Denied"); });
-        });
-        tb.appendChild(tr);
-      });
-    }).catch(function () { tb.innerHTML = "<tr><td colspan='4' class='muted'>Couldn't load keys.</td></tr>"; });
-  }
-  document.getElementById("keys-reload").addEventListener("click", loadKeys);
-  document.getElementById("key-gen").addEventListener("click", function () {
-    var k = "sk-site-" + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8);
-    document.getElementById("key-value").value = k;
-  });
-  document.getElementById("key-add").addEventListener("click", function () {
-    var domain = document.getElementById("key-domain").value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    var key = document.getElementById("key-value").value.trim();
-    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return ui.toast("Invalid domain", "e.g. app.example.com");
-    if (key.length < 8) return ui.toast("Weak key", "Generate one or type 8+ chars");
-    F.setDoc(F.doc(db, "api-keys", domain), { siteKey: key, active: true, addedAt: Date.now(), addedBy: (me && me.email) || "admin" })
-      .then(function () {
-        ui.toast("Domain verified", domain + " can now call the API");
-        document.getElementById("key-domain").value = "";
-        document.getElementById("key-value").value = "";
-        loadKeys();
-      }).catch(function () { ui.toast("Failed", "Write denied"); });
-  });
 })();
 </script>
 </body>
