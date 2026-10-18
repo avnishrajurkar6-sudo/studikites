@@ -15,7 +15,7 @@
  *   Anything else on playback -> 401. SESSION_SECRET must be set on Vercel.
  */
 const crypto = require("crypto");
-const { mediaRoutes, fetchUpstream } = require("./http");
+const { mediaRoutes, fetchUpstream, mirrorNig } = require("./http");
 
 function sessionSecret() {
   if (!process.env.SESSION_SECRET) {
@@ -82,19 +82,26 @@ async function checkIdToken(idToken) {
 /* Server-side free-preview check: first file at root, else first file one folder down. */
 async function freePreviewId(courseId) {
   const routes = mediaRoutes();
-  const get = async (folder) => {
-    const r = await fetchUpstream(`${routes.nig}?content=${encodeURIComponent(courseId)}&folder=${encodeURIComponent(folder)}`, { timeout: 8000 });
+  const mirror = mirrorNig();
+  const get = async (url) => {
+    const r = await fetchUpstream(url, { timeout: 8000 });
     if (!r.json) return null;
     const data = Array.isArray(r.json.data) ? r.json.data : (Array.isArray(r.json) ? r.json : null);
     return data;
   };
-  const root = await get("0").catch(() => null);
+  const fetchFolder = async (folder) => {
+    const nigUrl = `${routes.nig}?content=${encodeURIComponent(courseId)}&folder=${encodeURIComponent(folder)}`;
+    let data = await get(nigUrl).catch(() => null);
+    if (!data) data = await get(`${mirror}/?content=${encodeURIComponent(courseId)}&folder=${encodeURIComponent(folder)}`).catch(() => null);
+    return data;
+  };
+  const root = await fetchFolder("0");
   if (!root) return null;
   let f = root.find((x) => x && x.type === "file") || null;
   if (!f) {
     const folder = root.find((x) => x && x.type === "folder");
     if (folder) {
-      const sub = await get(String(folder.entity_id)).catch(() => null);
+      const sub = await fetchFolder(String(folder.entity_id));
       if (sub) f = sub.find((x) => x && x.type === "file") || null;
     }
   }
