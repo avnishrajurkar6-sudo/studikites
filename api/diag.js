@@ -15,12 +15,7 @@ module.exports = async function handler(req, res) {
       adsense: !!(process.env.ADSENSE_CLIENT || "ca-pub-7694333485336687"),
       rtdb: !!process.env.FIREBASE_STUDIKI_DATABASE_URL,
       adminEmails: !!process.env.ADMIN_EMAILS,
-      siteKey: !!process.env.SITE_KEY,
       xkiro: !!process.env.XKIRO_API_KEY,
-    },
-    siteAuth: {
-      fixedDomain: require("../lib/siteauth").fixedDomain(),
-      fixedKeySet: !!process.env.SITE_KEY,
     },
     keyCheck: {},
     checks: {},
