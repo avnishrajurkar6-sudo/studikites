@@ -1,7 +1,7 @@
 /* GET /api/media/live?course_id=&type=1&key=&device_id=
    type: 1 = live, 0 = upcoming, 2 = completed.
    Needs a well-formed app key+device (minted client-side via smexgod anon auth). */
-const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, mirrorNig, asId } = require("../../lib/http");
 const { validAppKey } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
@@ -17,9 +17,14 @@ module.exports = async function handler(req, res) {
       return sendJson(req, res, 400, { success: false, error: "Missing live-class parameters" });
     }
     const routes = mediaRoutes();
+    const mirror = mirrorNig();
     const params = new URLSearchParams({ action: "classes", type, course_id: courseId, key, device_id: deviceId }).toString();
     const upstream = await fetchUpstream(`${routes.play}?${params}`);
-    if (!upstream.json) return sendJson(req, res, upstream.status || 502, { success: false, error: "Classes fetch failed" });
+    if (!upstream.json) {
+      const mirrorRes = await fetchUpstream(`${mirror}/api/play?${params}`);
+      if (mirrorRes.json) return sendJson(req, res, mirrorRes.status, mirrorRes.json);
+      return sendJson(req, res, upstream.status || 502, { success: false, error: "Classes fetch failed" });
+    }
     return sendJson(req, res, upstream.status, upstream.json);
   } catch (err) {
     return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Classes fetch failed" });
