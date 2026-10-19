@@ -14,6 +14,10 @@ async function tryUrl(url) {
   return result;
 }
 
+function hostOf(url) {
+  try { return new URL(url).origin; } catch { return url; }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendJson(req, res, 204, {});
   if (!requireMethod(req, res, ["GET"])) return;
@@ -28,33 +32,39 @@ module.exports = async function handler(req, res) {
     const timestamp = Date.now();
     const routes = mediaRoutes();
     const mirrorBase = mirrorNig().replace(/\/$/, '');
-    const mirrorUrls = [
-      `${mirrorBase}/?content=${content}&folder=${folder}&_t=${timestamp}`,
-      `${mirrorBase}/api/nig?content=${content}&folder=${folder}&_t=${timestamp}`
-    ];
-    const primaryUrl = `${routes.nig}?content=${content}&folder=${folder}&_t=${timestamp}`;
+    const primaryHost = hostOf(routes.nig);
 
-    /* Try mirror variants first — Vercel IPs are often blocked on the vendor's primary domain. */
+    /* Build every URL variant worth trying, in order of likelihood. */
+    const candidates = [];
+
+    /* 1. Mirror root path (confirmed working from tests) */
+    candidates.push(`${mirrorBase}/?content=${content}&folder=${folder}&_t=${timestamp}`);
+
+    /* 2. Mirror /api/nt (vendor's real content path) */
+    candidates.push(`${mirrorBase}/api/nt?content=${content}&folder=${folder}&_t=${timestamp}`);
+
+    /* 3. Primary /api/nt (vendor's real content path — was missing before) */
+    candidates.push(`${primaryHost}/api/nt?content=${content}&folder=${folder}&_t=${timestamp}`);
+
+    /* 4. Primary configured route (/api/nig or whatever MEDIA_ROUTES_JSON says) */
+    candidates.push(`${routes.nig}?content=${content}&folder=${folder}&_t=${timestamp}`);
+
     let result = null;
-    for (const url of mirrorUrls) {
-      console.log(`[CONTENT] Step: Mirror URL: ${url}`);
+    for (const url of candidates) {
+      console.log(`[CONTENT] Trying: ${url}`);
       result = await tryUrl(url);
-      if (result.ok && result.json && result.json.success) break;
-    }
-
-    /* Fallback to primary vendor if all mirrors fail. */
-    if (!result.ok || !result.json || !result.json.success) {
-      console.log(`[CONTENT] Step: Primary URL: ${primaryUrl}`);
-      result = await tryUrl(primaryUrl);
+      if (result.ok && result.json && result.json.success) {
+        console.log(`[CONTENT] ✅ SUCCESS via ${url}`);
+        break;
+      }
     }
 
     if (result.ok && result.json && result.json.success) {
-      console.log(`[CONTENT] ✅ SUCCESS`);
       const responseData = Array.isArray(result.json.data) ? result.json.data : [];
       return sendJson(req, res, 200, { success: true, data: responseData, source: result.json.source || 'proxy' });
     }
 
-    console.error(`[CONTENT] ❌ Both mirror and primary failed. Last raw:`, result.text?.substring(0, 200));
+    console.error(`[CONTENT] ❌ All candidates failed. Last raw:`, result.text?.substring(0, 200));
     return sendJson(req, res, 502, { 
       success: false, 
       error: "Content provider temporarily unavailable. Please try again later.",
