@@ -60,7 +60,8 @@ window.SK.api = (function () {
   function content(courseId, folderId) {
     var attempts = 0, maxAttempts = 3;
     function attempt() {
-      return req("GET", "/api/courses/content", { params: { content: String(courseId), folder: String(folderId || "0") } })
+      var ts = Date.now();
+      return req("GET", "/api/courses/content", { params: { content: String(courseId), folder: String(folderId || "0"), _t: String(ts) } })
         .then(function (j) {
           var data = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : null);
           if (!data) throw new Error("Content API returned an unexpected shape");

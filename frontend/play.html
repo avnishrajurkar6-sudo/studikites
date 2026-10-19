@@ -96,7 +96,7 @@
 (function () {
   var ui = SK.ui, api = SK.api, fb = SK.fb;
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
-  var courseId = qp("course") || "", contentId = qp("content") || "", folderId = qp("folder") || "0";
+  var courseId = qp("course") || qp("courseId") || "", contentId = qp("content") || qp("contentId") || "", folderId = qp("folder") || "0";
   var user = null, play = null, hls = null;
   var video = document.getElementById("video");
   ui.boot({ status: "Loading lecture…" }).catch(function () {});
