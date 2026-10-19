@@ -79,7 +79,7 @@
 (function () {
   var ui = SK.ui, api = SK.api, fb = SK.fb;
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
-  var courseId = qp("course") || "", contentId = qp("content") || "";
+  var courseId = qp("course") || qp("courseId") || "", contentId = qp("content") || qp("contentId") || "", vdcId = qp("vdc_id") || "";
   var user = null, pdfUrl = "", pdfTitle = "Document", pdf = null, page = 1, scale = null;
   ui.boot({ status: "Opening notes…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
@@ -106,9 +106,10 @@
     var d;
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
-      d = await api.play(courseId, contentId, key.key, key.deviceId, headers);
+      d = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId);
     }
     catch (e) { fail(e.message || e); return; }
+    if (d && d.redirect && d.url) { location.href = d.url; return; }
     if (d.file_type !== undefined && d.file_type !== 1) { location.replace("play.html?course=" + courseId + "&content=" + contentId); return; }
     pdfTitle = d.title || pdfTitle; pdfUrl = d.file_url;
     document.getElementById("doc-title").textContent = pdfTitle;
