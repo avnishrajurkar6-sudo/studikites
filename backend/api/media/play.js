@@ -1,12 +1,14 @@
 /* GET /api/media/play?course_id=&content_id=&key=&device_id=&vdc_id=
    VERIFIED REQUESTS ONLY: playback keys minted client-side via smexgod (key +
    device_id always required). course_id/content_id gate enrollment when present.
-   Vendor /api/play now returns its own player HTML instead of JSON, so we:
-     1. proxy nt.studybeepro.site/vc/{vdc_id}  (WORKS → {file_url, token})
-     2. vendor /api/play + workers mirror (JSON {decryptedData.file_url})
-     3. redirect browser to vendor play.html (plays smoothly, user's key logic)
+
+   The vendor's own player page (nt.studybeepro.site/player.html) handles
+   Turnstile, 24h key verification, DRM license exchange, and HLS/Shaka
+   playback — our server-side proxy cannot replicate that. So when we have a
+   vdc_id we redirect the browser to the vendor player page instead of trying
+   to extract a video URL server-side.
 */
-const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, mirrorNig, asId } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, mirrorNig, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
 const { validAppKey } = require("../../lib/verify");
 
 function findUrl(obj) {
@@ -40,47 +42,41 @@ module.exports = async function handler(req, res) {
       await authorize(req, { courseId, contentId });
     }
     const routes = mediaRoutes();
-    const mirror = mirrorNig();
     const params = new URLSearchParams({ content_id: contentId, course_id: courseId, key, device_id: deviceId }).toString();
 
-    /* 1. vdc direct: nt.studybeepro.site/vc/{vdc_id} → {data:{data:{link:{file_url,token}}}} */
+    /* When we have a vdc_id, always redirect to the vendor player page.
+       The vendor player resolves Turnstile + key + DRM + HLS in-browser,
+       which we cannot do server-side. */
     if (vdcId) {
-      let vdcJson = null;
-      try { vdcJson = await fetchUpstream(`https://nt.studybeepro.site/vc/${encodeURIComponent(vdcId)}`, { timeout: 15000 }); } catch (e) {}
-      if (vdcJson && vdcJson.json) {
-        let stream = null, token = null;
-        const link = vdcJson.json.data && vdcJson.json.data.data && vdcJson.json.data.data.link;
-        if (link && link.file_url) { stream = link.file_url; token = link.token || ""; }
-        else { stream = findUrl(vdcJson.json.data || vdcJson.json); }
-        if (stream) {
-          return sendJson(req, res, 200, {
-            success: true, file_url: stream, token: token || "",
-            file_type: vdcJson.json.data && vdcJson.json.data.data && vdcJson.json.data.data.file_type,
-            title: String(contentId || vdcId),
-          });
-        }
-      }
+      const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player.html";
+      const redirectUrl = new URL(vendorBase);
+      if (courseId) redirectUrl.searchParams.set("courseId", courseId);
+      if (contentId) redirectUrl.searchParams.set("contentId", contentId);
+      redirectUrl.searchParams.set("vdc_id", vdcId);
+      redirectUrl.searchParams.set("key", key);
+      redirectUrl.searchParams.set("device_id", deviceId);
+      return sendJson(req, res, 200, { redirect: true, url: redirectUrl.toString() });
     }
 
-    /* 2. vendor /api/play + workers mirror (JSON) */
+    /* No vdc_id: fall back to vendor JSON APIs. */
     const upstream = await fetchUpstream(`${routes.play}?${params}`);
     if (upstream.json && upstream.json.decryptedData && upstream.json.decryptedData.file_url) {
       return sendJson(req, res, upstream.status, upstream.json);
     }
+    const mirror = mirrorNig();
     const mirrorRes = await fetchUpstream(`${mirror}/api/play?${params}`);
     if (mirrorRes.json && mirrorRes.json.decryptedData && mirrorRes.json.decryptedData.file_url) {
       return sendJson(req, res, mirrorRes.status, mirrorRes.json);
     }
 
-    /* 3. vendor returned HTML — redirect browser to vendor player page */
-    const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/play.html";
-    const redirectUrl = new URL(vendorBase);
-    if (courseId) redirectUrl.searchParams.set("courseId", courseId);
-    if (contentId) redirectUrl.searchParams.set("contentId", contentId);
-    if (vdcId) redirectUrl.searchParams.set("vdc_id", vdcId);
-    redirectUrl.searchParams.set("key", key);
-    redirectUrl.searchParams.set("device_id", deviceId);
-    return sendJson(req, res, 200, { redirect: true, url: redirectUrl.toString() });
+    /* Last resort: redirect to vendor player page anyway. */
+    const vendorBase2 = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player.html";
+    const redirectUrl2 = new URL(vendorBase2);
+    if (courseId) redirectUrl2.searchParams.set("courseId", courseId);
+    if (contentId) redirectUrl2.searchParams.set("contentId", contentId);
+    redirectUrl2.searchParams.set("key", key);
+    redirectUrl2.searchParams.set("device_id", deviceId);
+    return sendJson(req, res, 200, { redirect: true, url: redirectUrl2.toString() });
   } catch (err) {
     return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Play API rejected request" });
   }
