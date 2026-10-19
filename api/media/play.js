@@ -1,12 +1,10 @@
 /* GET /api/media/play?course_id=&content_id=&key=&device_id=&vdc_id=
-   VERIFIED REQUESTS ONLY: playback keys minted client-side via smexgod (key +
-   device_id always required). course_id/content_id gate enrollment when present.
-
-   Proxies the vendor's media endpoints directly and returns {success, file_url,
-   token, file_type} — no redirect to the vendor site, no Turnstile, no 24h key
-   page. PDF and video share this exact route.
+   VERIFIED REQUESTS ONLY: playback keys minted client-side via smexgod
+   (key + device_id always required). Proxy vendor media endpoints directly
+   and return {success, file_url, token, file_type} — no redirect, no Turnstile,
+   no 24h key page. PDF and video share this exact route.
 */
-const { sendJson, sendOptions, requireMethod, mediaRoutes, mirrorNig, fetchUpstream, asId } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, mirrorNig, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
 const { validAppKey } = require("../../lib/verify");
 
 const BROWSER_HEADERS = {
@@ -42,11 +40,10 @@ function findUrl(obj) {
 function extractMedia(json) {
   if (!json || typeof json !== 'object') return null;
 
-  /* Vendor wraps data at different depths: json.decryptedData, json.data, or json itself */
   let data = json.decryptedData || json.data || json;
   if (!data || typeof data !== 'object') return null;
 
-  /* Vendor /vc/{vdc_id} wraps as {data: {data: {link: {file_url, token}}}} */
+  /* Vendor /vc/{vdc_id}: {data: {data: {link: {file_url, token}}}} */
   if (data.data && data.data.link && data.data.link.file_url) {
     return {
       file_url: data.data.link.file_url,
@@ -58,7 +55,7 @@ function extractMedia(json) {
     };
   }
 
-  /* Direct file_url at top level of data */
+  /* Direct file_url at top level of data (vendor /vc/media) */
   if (data.file_url) {
     return {
       file_url: data.file_url,
@@ -70,7 +67,7 @@ function extractMedia(json) {
     };
   }
 
-  /* Deep search for any file_url */
+  /* Deep search fallback */
   const found = findUrl(data);
   if (found) {
     return { file_url: found, token: "", file_type: null, title: "", is_drm: false, vdc_id: "" };
@@ -94,41 +91,29 @@ module.exports = async function handler(req, res) {
       return sendJson(req, res, 400, { success: false, error: "Missing playback parameters" });
     }
 
-    if (courseId && contentId) {
-      const { authorize } = require("../../lib/verify");
-      await authorize(req, { courseId, contentId });
-    }
-
     const routes = mediaRoutes();
     const mirrorBase = mirrorNig().replace(/\/$/, '');
     const timestamp = Date.now();
     const params = new URLSearchParams({ content_id: contentId, course_id: courseId, key, device_id: deviceId }).toString();
 
-    /* Build candidate URLs in priority order. PDF and video both use these. */
+    /* Candidate URLs in priority order — PDF and video both use these. */
     const candidates = [];
 
     if (courseId && contentId) {
-      /* 1. Vendor /vc/media — what vendor's own player.html calls */
       candidates.push(`https://nt.studybeepro.site/vc/media?course_id=${courseId}&content_id=${contentId}&_t=${timestamp}`);
-      /* 2. Mirror /vc/media */
       candidates.push(`${mirrorBase}/vc/media?course_id=${courseId}&content_id=${contentId}&_t=${timestamp}`);
     }
 
     if (vdcId) {
-      /* 3. Vendor /vc/{vdc_id} direct */
       candidates.push(`https://nt.studybeepro.site/vc/${encodeURIComponent(vdcId)}`);
-      /* 4. Mirror /vc/{vdc_id} */
       candidates.push(`${mirrorBase}/vc/${encodeURIComponent(vdcId)}`);
     }
 
-    /* 5. Vendor /api/play JSON */
     candidates.push(`${routes.play}?${params}&_t=${timestamp}`);
-    /* 6. Mirror /api/play */
     candidates.push(`${mirrorBase}/api/play?${params}&_t=${timestamp}`);
 
-    let result = null;
     for (const url of candidates) {
-      result = await tryUrl(url);
+      const result = await tryUrl(url);
       const extracted = extractMedia(result.json);
       if (extracted) {
         console.log(`[PLAY] ✅ SUCCESS via ${url}`);
@@ -136,8 +121,8 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    /* All proxy attempts failed — absolute last resort: redirect to vendor player */
-    console.error(`[PLAY] ❌ All proxy attempts failed. Last status: ${result ? result.status : 'none'}`);
+    /* Absolute last resort — vendor player page redirect. */
+    console.error(`[PLAY] ❌ All proxy attempts failed`);
     const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player.html";
     const redirectUrl = new URL(vendorBase);
     if (courseId) redirectUrl.searchParams.set("courseId", courseId);
