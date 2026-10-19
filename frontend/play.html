@@ -131,6 +131,11 @@
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
       play = await api.play(courseId, contentId, key.key, key.deviceId, headers);
+      if (play && play.redirect && play.url) {
+        location.href = play.url;
+        return;
+      }
+      if (!play || !play.file_url) throw new Error(play && play.error ? play.error : "No video URL returned");
     } catch (e) {
       document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Couldn\'t load lecture</h2><p class="muted">' + ui.esc(e.message || e) + '</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
       return;
