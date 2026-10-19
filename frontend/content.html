@@ -214,10 +214,12 @@
       if (user) { open(); return; }
       api.isFreePreview(courseId, it.entity_id).then(function (ok) {
         if (ok) { ui.toast("Free preview", "First lecture is free"); open(); }
-        else {
-          ui.toast("Sign in required", "First lecture is free — sign in for the rest");
-          setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(((isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + (it.data && it.data.vdc_id ? "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id)) : "")))); }, 600);
-        }
+      else {
+        ui.toast("Sign in required", "First lecture is free — sign in for the rest");
+        var nextPage = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id;
+        if (it.data && it.data.vdc_id) nextPage += "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id));
+        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(nextPage); }, 600);
+      }
       });
     }
     el.addEventListener("click", go);
