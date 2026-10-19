@@ -27,17 +27,24 @@ module.exports = async function handler(req, res) {
 
     const timestamp = Date.now();
     const routes = mediaRoutes();
-    const mirror = mirrorNig();
+    const mirrorBase = mirrorNig().replace(/\/$/, '');
+    const mirrorUrls = [
+      `${mirrorBase}/?content=${content}&folder=${folder}&_t=${timestamp}`,
+      `${mirrorBase}/api/nig?content=${content}&folder=${folder}&_t=${timestamp}`
+    ];
+    const primaryUrl = `${routes.nig}?content=${content}&folder=${folder}&_t=${timestamp}`;
 
-    /* Try mirror first — Vercel IPs are often blocked on the vendor's primary domain. */
-    const mirrorUrl = `${mirror}?content=${content}&folder=${folder}&_t=${timestamp}`;
-    console.log(`[CONTENT] Step 1: Mirror URL: ${mirrorUrl}`);
-    let result = await tryUrl(mirrorUrl);
+    /* Try mirror variants first — Vercel IPs are often blocked on the vendor's primary domain. */
+    let result = null;
+    for (const url of mirrorUrls) {
+      console.log(`[CONTENT] Step: Mirror URL: ${url}`);
+      result = await tryUrl(url);
+      if (result.ok && result.json && result.json.success) break;
+    }
 
-    /* Fallback to primary vendor if mirror fails. */
+    /* Fallback to primary vendor if all mirrors fail. */
     if (!result.ok || !result.json || !result.json.success) {
-      const primaryUrl = `${routes.nig}?content=${content}&folder=${folder}&_t=${timestamp}`;
-      console.log(`[CONTENT] Step 2: Primary URL: ${primaryUrl}`);
+      console.log(`[CONTENT] Step: Primary URL: ${primaryUrl}`);
       result = await tryUrl(primaryUrl);
     }
 
