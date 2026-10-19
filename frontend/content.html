@@ -207,14 +207,16 @@
       try { sessionStorage.setItem("player_" + courseId + "_" + it.entity_id, JSON.stringify(it)); } catch (e) {}
       function open() {
         var folder = pathIds.length ? pathIds[pathIds.length - 1] : "0";
-        location.href = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + "&folder=" + encodeURIComponent(folder);
+        var vdcParam = "";
+        try { if (it.data && it.data.vdc_id) vdcParam = "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id)); } catch (e) {}
+        location.href = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + "&folder=" + encodeURIComponent(folder) + vdcParam;
       }
       if (user) { open(); return; }
       api.isFreePreview(courseId, it.entity_id).then(function (ok) {
         if (ok) { ui.toast("Free preview", "First lecture is free"); open(); }
         else {
           ui.toast("Sign in required", "First lecture is free — sign in for the rest");
-          setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(((isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id)); }, 600);
+          setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(((isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + (it.data && it.data.vdc_id ? "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id)) : "")))); }, 600);
         }
       });
     }

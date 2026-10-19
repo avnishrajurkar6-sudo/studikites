@@ -65,8 +65,8 @@ window.SK.api = (function () {
         return data;
       });
   }
-  function play(courseId, contentId, key, deviceId, headers) {
-    return req("GET", "/api/media/play", { params: { course_id: String(courseId), content_id: String(contentId), key: key, device_id: deviceId }, headers: headers })
+  function play(courseId, contentId, key, deviceId, headers, vdcId) {
+    return req("GET", "/api/media/play", { params: { course_id: String(courseId), content_id: String(contentId), key: key, device_id: deviceId, vdc_id: vdcId || "" }, headers: headers })
       .then(function (j) {
         if (!j.decryptedData || !j.decryptedData.file_url) throw new Error(j.reason || j.error || "Play API rejected request");
         return j.decryptedData;

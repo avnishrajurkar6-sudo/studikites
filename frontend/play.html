@@ -130,7 +130,8 @@
     }
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
-      play = await api.play(courseId, contentId, key.key, key.deviceId, headers);
+      var vdcId = qp("vdc_id") || "";
+      play = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId);
       if (play && play.redirect && play.url) {
         location.href = play.url;
         return;
