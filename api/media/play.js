@@ -45,16 +45,17 @@ module.exports = async function handler(req, res) {
 
     /* 1. vdc direct: nt.studybeepro.site/vc/{vdc_id} → {data:{data:{link:{file_url,token}}}} */
     if (vdcId) {
-      const vdcRes = await fetchUpstream(`https://nt.studybeepro.site/vc/${encodeURIComponent(vdcId)}`, { timeout: 15000 });
-      if (vdcRes.json) {
+      let vdcJson = null;
+      try { vdcJson = await fetchUpstream(`https://nt.studybeepro.site/vc/${encodeURIComponent(vdcId)}`, { timeout: 15000 }); } catch (e) {}
+      if (vdcJson && vdcJson.json) {
         let stream = null, token = null;
-        const link = vdcRes.json.data && vdcRes.json.data.data && vdcRes.json.data.data.link;
+        const link = vdcJson.json.data && vdcJson.json.data.data && vdcJson.json.data.data.link;
         if (link && link.file_url) { stream = link.file_url; token = link.token || ""; }
-        else { stream = findUrl(vdcRes.json.data || vdcRes.json); }
+        else { stream = findUrl(vdcJson.json.data || vdcJson.json); }
         if (stream) {
           return sendJson(req, res, 200, {
             success: true, file_url: stream, token: token || "",
-            file_type: vdcRes.json.data && vdcRes.json.data.data && vdcRes.json.data.data.file_type,
+            file_type: vdcJson.json.data && vdcJson.json.data.data && vdcJson.json.data.data.file_type,
             title: String(contentId || vdcId),
           });
         }
