@@ -1,15 +1,13 @@
 /* GET /api/media/play?course_id=&content_id=&key=&device_id=&vdc_id=
-   VERIFIED REQUESTS ONLY: Firebase ID token, backend phone session, or the
-   course's free-preview file (checked server-side). Playback keys are still
-   minted client-side in smexgod and forwarded here.
-
-   Vendor now serves its own player HTML at /api/play instead of JSON, so we:
-     1. try vendor /api/play + workers mirror (JSON {decryptedData.file_url})
-     2. if vdc_id given, proxy nt.studybeepro.site/vc/{vdc_id}  (WORKS, returns {file_url, token})
-     3. last resort: redirect browser to vendor player page
+   VERIFIED REQUESTS ONLY: playback keys minted client-side via smexgod (key +
+   device_id always required). course_id/content_id gate enrollment when present.
+   Vendor /api/play now returns its own player HTML instead of JSON, so we:
+     1. proxy nt.studybeepro.site/vc/{vdc_id}  (WORKS → {file_url, token})
+     2. vendor /api/play + workers mirror (JSON {decryptedData.file_url})
+     3. redirect browser to vendor play.html (plays smoothly, user's key logic)
 */
 const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, mirrorNig, asId } = require("../../lib/http");
-const { authorize } = require("../../lib/verify");
+const { validAppKey } = require("../../lib/verify");
 
 function findUrl(obj) {
   if (!obj) return null;
@@ -33,25 +31,19 @@ module.exports = async function handler(req, res) {
     const key = asId(q.key, 64);
     const deviceId = asId(q.device_id, 128);
     const vdcId = String(q.vdc_id || "").trim();
-    if (!courseId || !contentId || !key || !deviceId) {
+    if (!key || !deviceId || !validAppKey(key, deviceId)) {
       return sendJson(req, res, 400, { success: false, error: "Missing playback parameters" });
     }
-    await authorize(req, { courseId, contentId });
+    /* Enrollment / free-preview gate only when course+content given. */
+    if (courseId && contentId) {
+      const { authorize } = require("../../lib/verify");
+      await authorize(req, { courseId, contentId });
+    }
     const routes = mediaRoutes();
     const mirror = mirrorNig();
     const params = new URLSearchParams({ content_id: contentId, course_id: courseId, key, device_id: deviceId }).toString();
 
-    /* 1. vendor /api/play + workers mirror (JSON) */
-    const upstream = await fetchUpstream(`${routes.play}?${params}`);
-    if (upstream.json && upstream.json.decryptedData && upstream.json.decryptedData.file_url) {
-      return sendJson(req, res, upstream.status, upstream.json);
-    }
-    const mirrorRes = await fetchUpstream(`${mirror}/api/play?${params}`);
-    if (mirrorRes.json && mirrorRes.json.decryptedData && mirrorRes.json.decryptedData.file_url) {
-      return sendJson(req, res, mirrorRes.status, mirrorRes.json);
-    }
-
-    /* 2. vdc direct: nt.studybeepro.site/vc/{vdc_id} → {data:{data:{link:{file_url,token}}}} */
+    /* 1. vdc direct: nt.studybeepro.site/vc/{vdc_id} → {data:{data:{link:{file_url,token}}}} */
     if (vdcId) {
       const vdcRes = await fetchUpstream(`https://nt.studybeepro.site/vc/${encodeURIComponent(vdcId)}`, { timeout: 15000 });
       if (vdcRes.json) {
@@ -63,20 +55,30 @@ module.exports = async function handler(req, res) {
           return sendJson(req, res, 200, {
             success: true, file_url: stream, token: token || "",
             file_type: vdcRes.json.data && vdcRes.json.data.data && vdcRes.json.data.data.file_type,
-            title: String(contentId),
+            title: String(contentId || vdcId),
           });
         }
       }
     }
 
-    /* 3. vendor returned HTML (own player page) — redirect browser there */
-    const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player";
+    /* 2. vendor /api/play + workers mirror (JSON) */
+    const upstream = await fetchUpstream(`${routes.play}?${params}`);
+    if (upstream.json && upstream.json.decryptedData && upstream.json.decryptedData.file_url) {
+      return sendJson(req, res, upstream.status, upstream.json);
+    }
+    const mirrorRes = await fetchUpstream(`${mirror}/api/play?${params}`);
+    if (mirrorRes.json && mirrorRes.json.decryptedData && mirrorRes.json.decryptedData.file_url) {
+      return sendJson(req, res, mirrorRes.status, mirrorRes.json);
+    }
+
+    /* 3. vendor returned HTML — redirect browser to vendor player page */
+    const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/play.html";
     const redirectUrl = new URL(vendorBase);
-    redirectUrl.searchParams.set("courseId", courseId);
-    redirectUrl.searchParams.set("contentId", contentId);
+    if (courseId) redirectUrl.searchParams.set("courseId", courseId);
+    if (contentId) redirectUrl.searchParams.set("contentId", contentId);
+    if (vdcId) redirectUrl.searchParams.set("vdc_id", vdcId);
     redirectUrl.searchParams.set("key", key);
     redirectUrl.searchParams.set("device_id", deviceId);
-    if (vdcId) redirectUrl.searchParams.set("vdc_id", vdcId);
     return sendJson(req, res, 200, { redirect: true, url: redirectUrl.toString() });
   } catch (err) {
     return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Play API rejected request" });
