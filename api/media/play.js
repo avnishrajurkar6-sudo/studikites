@@ -27,8 +27,16 @@ module.exports = async function handler(req, res) {
       if (mirrorRes.json && mirrorRes.json.decryptedData && mirrorRes.json.decryptedData.file_url) {
         return sendJson(req, res, mirrorRes.status, mirrorRes.json);
       }
-      const reason = (upstream.json && (upstream.json.reason || upstream.json.error)) || "Play API rejected request";
-      return sendJson(req, res, upstream.json ? 400 : upstream.status || 502, upstream.json || { success: false, error: reason });
+      /* Vendor now serves its own player page (Turnstile + 24h key) instead of
+         JSON. Redirect the browser there so the vendor's player handles playback.
+         VENDOR_PLAYER_URL in Vercel env overrides the default path. */
+      const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player";
+      const redirectUrl = new URL(vendorBase);
+      redirectUrl.searchParams.set("courseId", courseId);
+      redirectUrl.searchParams.set("contentId", contentId);
+      redirectUrl.searchParams.set("key", key);
+      redirectUrl.searchParams.set("device_id", deviceId);
+      return sendJson(req, res, 200, { redirect: true, url: redirectUrl.toString() });
     }
     return sendJson(req, res, upstream.status, upstream.json);
   } catch (err) {
