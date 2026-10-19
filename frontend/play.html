@@ -132,6 +132,7 @@
       var headers = await fb.authHeaders().catch(function () { return {}; });
       var vdcId = qp("vdc_id") || "";
       play = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId);
+      console.log("[PLAY] API result:", play);
       if (play && play.redirect && play.url) {
         location.href = play.url;
         return;
@@ -142,6 +143,7 @@
       return;
     }
     if (play.file_type === 1) { location.replace("pdf.html?course=" + courseId + "&content=" + contentId); return; }
+    console.log("[PLAY] file_url:", play.file_url, "file_type:", play.file_type);
     document.getElementById("doc-title").textContent = play.title || "Lecture";
     document.title = "StudiKitEZ — " + (play.title || "Lecture");
     SK.fb.presenceBeat(undefined, "watching · " + (play.title || "lecture"));
@@ -151,6 +153,7 @@
   }
 
   function attach(url) {
+    console.log("[PLAY] attach() called with:", url);
     var yt = !/\.(m3u8|mp4)/i.test(url) && (/^[A-Za-z0-9_-]{11}$/.test(url) || /youtube\.com|youtu\.be/.test(url));
     if (yt) {
       var id = /^[A-Za-z0-9_-]{11}$/.test(url) ? url : ((url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/) || [])[1]);
@@ -171,8 +174,14 @@
           });
         });
       });
+      hls.on(Hls.Events.ERROR, function (ev, data) {
+        console.error("[PLAY] HLS ERROR:", ev, data);
+        document.getElementById("veil").classList.add("hide");
+        document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>HLS Error</h2><p class="muted">Could not load stream. Try again later.</p></div>';
+      });
       hls.loadSource(url); hls.attachMedia(video);
     } else {
+      console.log("[PLAY] Setting direct video.src:", url);
       video.src = url;
       document.getElementById("quals").innerHTML = '<span class="mono muted" style="font-size:.7rem">progressive · auto</span>';
     }
