@@ -2,14 +2,19 @@
    VERIFIED REQUESTS ONLY: playback keys minted client-side via smexgod (key +
    device_id always required). course_id/content_id gate enrollment when present.
 
-   The vendor's own player page (nt.studybeepro.site/player.html) handles
-   Turnstile, 24h key verification, DRM license exchange, and HLS/Shaka
-   playback — our server-side proxy cannot replicate that. So when we have a
-   vdc_id we redirect the browser to the vendor player page instead of trying
-   to extract a video URL server-side.
+   Proxies the vendor's /vc/media endpoint (same one their own player.html
+   calls) and returns the direct file_url + token — no redirect to the vendor
+   site, no Turnstile, no 24h key page. PDF and video share this route.
 */
 const { sendJson, sendOptions, requireMethod, mirrorNig, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
 const { validAppKey } = require("../../lib/verify");
+
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Referer': 'https://nt.studybeepro.site/player.html',
+  'Origin': 'https://nt.studybeepro.site'
+};
 
 function findUrl(obj) {
   if (!obj) return null;
@@ -21,6 +26,28 @@ function findUrl(obj) {
     for (const k in obj) { const u = findUrl(obj[k]); if (u) return u; }
   }
   return null;
+}
+
+function extractMedia(json) {
+  if (!json) return null;
+  const contentData = json.decryptedData || json.data || json;
+  if (!contentData) return null;
+  const fileUrl = contentData.file_url || findUrl(contentData);
+  if (!fileUrl) return null;
+  return {
+    file_url: fileUrl,
+    token: contentData.token || "",
+    file_type: contentData.file_type,
+    title: contentData.title || "",
+    is_drm: contentData.is_drm == 1,
+    vdc_id: contentData.vdc_id || ""
+  };
+}
+
+async function tryUrl(url) {
+  const result = await fetchUpstream(url, { headers: BROWSER_HEADERS, timeout: 15000 });
+  console.log(`[PLAY] ${url} -> status=${result.status} ok=${result.ok} hasJson=${!!result.json}`);
+  return result;
 }
 
 module.exports = async function handler(req, res) {
@@ -42,41 +69,81 @@ module.exports = async function handler(req, res) {
       await authorize(req, { courseId, contentId });
     }
     const routes = mediaRoutes();
+    const mirror = mirrorNig();
+    const timestamp = Date.now();
     const params = new URLSearchParams({ content_id: contentId, course_id: courseId, key, device_id: deviceId }).toString();
 
-    /* When we have a vdc_id, always redirect to the vendor player page.
-       The vendor player resolves Turnstile + key + DRM + HLS in-browser,
-       which we cannot do server-side. */
+    /* 1. Vendor /vc/media?course_id=&content_id= (what vendor's own player.html calls) */
+    if (courseId && contentId) {
+      const mediaUrl = `https://nt.studybeepro.site/vc/media?course_id=${courseId}&content_id=${contentId}&_t=${timestamp}`;
+      console.log(`[PLAY] Step 1: vendor /vc/media: ${mediaUrl}`);
+      let result = await tryUrl(mediaUrl);
+      const extracted = extractMedia(result.json);
+      if (extracted) {
+        console.log(`[PLAY] ✅ SUCCESS via /vc/media`);
+        return sendJson(req, res, 200, { success: true, ...extracted });
+      }
+      /* Mirror fallback for /vc/media */
+      const mirrorMedia = `${mirror.replace(/\/$/, '')}/vc/media?course_id=${courseId}&content_id=${contentId}&_t=${timestamp}`;
+      console.log(`[PLAY] Step 2: mirror /vc/media: ${mirrorMedia}`);
+      result = await tryUrl(mirrorMedia);
+      const extracted2 = extractMedia(result.json);
+      if (extracted2) {
+        console.log(`[PLAY] ✅ SUCCESS via mirror /vc/media`);
+        return sendJson(req, res, 200, { success: true, ...extracted2 });
+      }
+    }
+
+    /* 2. Vendor /vc/{vdc_id} direct (if vdc_id provided) */
     if (vdcId) {
-      const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player.html";
-      const redirectUrl = new URL(vendorBase);
-      if (courseId) redirectUrl.searchParams.set("courseId", courseId);
-      if (contentId) redirectUrl.searchParams.set("contentId", contentId);
-      redirectUrl.searchParams.set("vdc_id", vdcId);
-      redirectUrl.searchParams.set("key", key);
-      redirectUrl.searchParams.set("device_id", deviceId);
-      return sendJson(req, res, 200, { redirect: true, url: redirectUrl.toString() });
+      const vdcUrl = `https://nt.studybeepro.site/vc/${encodeURIComponent(vdcId)}`;
+      console.log(`[PLAY] Step 3: vendor /vc/{vdc_id}: ${vdcUrl}`);
+      let result = await tryUrl(vdcUrl);
+      const extracted = extractMedia(result.json);
+      if (!extracted && result.json) {
+        /* vendor wraps as {data:{data:{link:{file_url,token}}}} */
+        const link = result.json.data && result.json.data.data && result.json.data.data.link;
+        if (link && link.file_url) extracted = { file_url: link.file_url, token: link.token || "", file_type: null, title: String(contentId || vdcId) };
+      }
+      if (extracted) {
+        console.log(`[PLAY] ✅ SUCCESS via /vc/{vdc_id}`);
+        return sendJson(req, res, 200, { success: true, ...extracted });
+      }
+      /* Mirror fallback for /vc/{vdc_id} */
+      const mirrorVdc = `${mirror.replace(/\/$/, '')}/vc/${encodeURIComponent(vdcId)}`;
+      console.log(`[PLAY] Step 4: mirror /vc/{vdc_id}: ${mirrorVdc}`);
+      result = await tryUrl(mirrorVdc);
+      const extracted3 = extractMedia(result.json);
+      if (extracted3) {
+        console.log(`[PLAY] ✅ SUCCESS via mirror /vc/{vdc_id}`);
+        return sendJson(req, res, 200, { success: true, ...extracted3 });
+      }
     }
 
-    /* No vdc_id: fall back to vendor JSON APIs. */
-    const upstream = await fetchUpstream(`${routes.play}?${params}`);
-    if (upstream.json && upstream.json.decryptedData && upstream.json.decryptedData.file_url) {
-      return sendJson(req, res, upstream.status, upstream.json);
+    /* 3. Vendor /api/play + mirror (JSON) */
+    const upstream = await tryUrl(`${routes.play}?${params}&_t=${timestamp}`);
+    const extracted4 = extractMedia(upstream.json);
+    if (extracted4) {
+      console.log(`[PLAY] ✅ SUCCESS via vendor /api/play`);
+      return sendJson(req, res, 200, { success: true, ...extracted4 });
     }
-    const mirror = mirrorNig();
-    const mirrorRes = await fetchUpstream(`${mirror}/api/play?${params}`);
-    if (mirrorRes.json && mirrorRes.json.decryptedData && mirrorRes.json.decryptedData.file_url) {
-      return sendJson(req, res, mirrorRes.status, mirrorRes.json);
+    const mirrorRes = await tryUrl(`${mirror}/api/play?${params}&_t=${timestamp}`);
+    const extracted5 = extractMedia(mirrorRes.json);
+    if (extracted5) {
+      console.log(`[PLAY] ✅ SUCCESS via mirror /api/play`);
+      return sendJson(req, res, 200, { success: true, ...extracted5 });
     }
 
-    /* Last resort: redirect to vendor player page anyway. */
-    const vendorBase2 = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player.html";
-    const redirectUrl2 = new URL(vendorBase2);
-    if (courseId) redirectUrl2.searchParams.set("courseId", courseId);
-    if (contentId) redirectUrl2.searchParams.set("contentId", contentId);
-    redirectUrl2.searchParams.set("key", key);
-    redirectUrl2.searchParams.set("device_id", deviceId);
-    return sendJson(req, res, 200, { redirect: true, url: redirectUrl2.toString() });
+    /* 4. Absolute last resort: redirect to vendor player page. */
+    console.error(`[PLAY] ❌ All proxy attempts failed. Redirecting to vendor player.`);
+    const vendorBase = process.env.VENDOR_PLAYER_URL || "https://nt.studybeepro.site/player.html";
+    const redirectUrl = new URL(vendorBase);
+    if (courseId) redirectUrl.searchParams.set("courseId", courseId);
+    if (contentId) redirectUrl.searchParams.set("contentId", contentId);
+    if (vdcId) redirectUrl.searchParams.set("vdc_id", vdcId);
+    redirectUrl.searchParams.set("key", key);
+    redirectUrl.searchParams.set("device_id", deviceId);
+    return sendJson(req, res, 200, { redirect: true, url: redirectUrl.toString() });
   } catch (err) {
     return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Play API rejected request" });
   }
