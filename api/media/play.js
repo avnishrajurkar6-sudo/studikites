@@ -45,35 +45,39 @@ function extractMedia(json) {
 
   /* Vendor /vc/{vdc_id}: {data: {data: {link: {file_url, token}}}} */
   if (data.data && data.data.link && data.data.link.file_url) {
-    return {
-      file_url: data.data.link.file_url,
-      token: data.data.link.token || "",
-      file_type: data.file_type || null,
-      title: data.title || "",
-      is_drm: data.is_drm == 1,
-      vdc_id: data.vdc_id || ""
-    };
+    return normalizeFileUrl(data.data.link.file_url, data.data.link.token || "", data.file_type || null, data.title || "", data.is_drm == 1, data.vdc_id || "");
   }
 
   /* Direct file_url at top level of data (vendor /vc/media) */
   if (data.file_url) {
-    return {
-      file_url: data.file_url,
-      token: data.token || "",
-      file_type: data.file_type || null,
-      title: data.title || "",
-      is_drm: data.is_drm == 1,
-      vdc_id: data.vdc_id || ""
-    };
+    return normalizeFileUrl(data.file_url, data.token || "", data.file_type || null, data.title || "", data.is_drm == 1, data.vdc_id || "");
   }
 
   /* Deep search fallback */
   const found = findUrl(data);
   if (found) {
-    return { file_url: found, token: "", file_type: null, title: "", is_drm: false, vdc_id: "" };
+    return normalizeFileUrl(found, "", null, "", false, "");
   }
 
   return null;
+}
+
+/* Validate that the extracted URL is a real video/PDF stream, not a
+   Cloudflare error page or HTML document returned by the vendor WAF. */
+function normalizeFileUrl(url, token, file_type, title, is_drm, vdc_id) {
+  if (!url || typeof url !== 'string') return null;
+  const u = String(url).trim();
+  /* Reject Cloudflare error pages, HTML docs, and non-stream URLs */
+  if (/developers\.cloudflare\.com|cloudflare\.com\/support|error\.html|blocked|captcha/i.test(u)) return null;
+  if (!/^https?:\/\//i.test(u)) return null;
+  return {
+    file_url: u,
+    token: token || "",
+    file_type: file_type || null,
+    title: title || "",
+    is_drm: is_drm || false,
+    vdc_id: vdc_id || ""
+  };
 }
 
 module.exports = async function handler(req, res) {
