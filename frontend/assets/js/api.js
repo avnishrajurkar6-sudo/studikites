@@ -58,19 +58,33 @@ window.SK.api = (function () {
   }
 
   function content(courseId, folderId) {
-    return req("GET", "/api/courses/content", { params: { content: String(courseId), folder: String(folderId || "0") } })
-      .then(function (j) {
-        var data = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : null);
-        if (!data) throw new Error("Content API returned an unexpected shape");
-        return data;
-      });
+    var attempts = 0, maxAttempts = 3;
+    function attempt() {
+      return req("GET", "/api/courses/content", { params: { content: String(courseId), folder: String(folderId || "0") } })
+        .then(function (j) {
+          var data = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : null);
+          if (!data) throw new Error("Content API returned an unexpected shape");
+          return data;
+        }).catch(function (e) {
+          attempts++;
+          var msg = String(e.message || "");
+          if ((msg.includes("429") || msg.includes("502") || msg.includes("504")) && attempts < maxAttempts) {
+            var delay = attempts * 1500;
+            return new Promise(function (resolve) { setTimeout(resolve, delay); }).then(attempt);
+          }
+          throw e;
+        });
+    }
+    return attempt();
   }
   function play(courseId, contentId, key, deviceId, headers, vdcId) {
     return req("GET", "/api/media/play", { params: { course_id: String(courseId), content_id: String(contentId), key: key, device_id: deviceId, vdc_id: vdcId || "" }, headers: headers })
       .then(function (j) {
-        if (!j.decryptedData || !j.decryptedData.file_url) throw new Error(j.reason || j.error || "Play API rejected request");
-        return j.decryptedData;
-      });
+      if (j && j.redirect && j.url) return { redirect: true, url: j.url };
+      var data = j.decryptedData || j;
+      if (!data || !data.file_url) throw new Error(j.error || j.reason || "No video URL returned");
+      return data;
+    });
   }
   function live(courseId, type, key, deviceId, headers) {
     return req("GET", "/api/media/live", { params: { course_id: String(courseId), type: String(type || "1"), key: key, device_id: deviceId }, headers: headers })
