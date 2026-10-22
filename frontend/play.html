@@ -139,7 +139,8 @@
       }
       if (!play || !play.file_url) throw new Error(play && play.error ? play.error : "No video URL returned");
     } catch (e) {
-      document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Couldn\'t load lecture</h2><p class="muted">' + ui.esc(e.message || e) + '</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
+      console.error("[PLAY] Failed:", e.message);
+      location.href = "maintenance.html?reason=" + encodeURIComponent(e.message || "playback_failed");
       return;
     }
     if (play.file_type === 1) { location.replace("pdf.html?course=" + courseId + "&content=" + contentId); return; }
@@ -176,8 +177,7 @@
       });
       hls.on(Hls.Events.ERROR, function (ev, data) {
         console.error("[PLAY] HLS ERROR:", ev, data);
-        document.getElementById("veil").classList.add("hide");
-        document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>HLS Error</h2><p class="muted">Could not load stream. Try again later.</p></div>';
+        location.href = "maintenance.html?reason=" + encodeURIComponent("hls_error");
       });
       hls.loadSource(url); hls.attachMedia(video);
     } else {

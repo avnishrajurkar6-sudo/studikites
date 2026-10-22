@@ -125,7 +125,8 @@
     } catch (e) { fail("Could not render this document — try Download."); }
   }
   function fail(msg) {
-    document.getElementById("pdf-stage").innerHTML = '<div class="empty" style="border:0"><h3>Couldn\'t open this file</h3><p>' + ui.esc(msg) + '</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
+    console.error("[PDF] Failed:", msg);
+    location.href = "maintenance.html?reason=" + encodeURIComponent(msg || "pdf_failed");
   }
   document.getElementById("pdf-open").addEventListener("click", function () { if (pdfUrl) window.open(pdfUrl, "_blank", "noopener"); });
   document.getElementById("pdf-dl").addEventListener("click", async function () {
