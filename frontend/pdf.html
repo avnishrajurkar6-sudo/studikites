@@ -110,7 +110,10 @@
       var ok = await api.isFreePreview(courseId, contentId).catch(function () { return false; });
       if (!ok) {
         ui.toast("Sign in required", "First document is free — sign in for the rest");
-        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent("pdf.html?course=" + courseId + "&content=" + contentId); }, 800);
+        var selfNext = "pdf.html?course=" + courseId + "&content=" + contentId +
+          (vdcId ? "&vdc_id=" + encodeURIComponent(vdcId) : "") +
+          (hintedTitle ? "&title=" + encodeURIComponent(hintedTitle) : "");
+        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(selfNext); }, 800);
         return;
       }
     }
@@ -136,8 +139,20 @@
     pdfUrl = d.file_url;
     SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
     try {
+      /* CMaps + standard fonts: required for Devanagari/CJK text PDFs, and
+         the reason some notes rendered as blank white pages. */
+      var docOpts = {
+        url: pdfUrl,
+        withCredentials: false,
+        cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
+        cMapPacked: true,
+        standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/",
+        wasmUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/wasm/",
+        useSystemFonts: true,
+        disableAutoFetch: true
+      };
       try {
-        pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise;
+        pdf = await pdfjsLib.getDocument(docOpts).promise;
       } catch (first) {
         /* Range/CORS/worker failures: pull the bytes once and parse locally. */
         console.warn("[PDF] direct load failed, retrying as buffer:", first && first.message);
@@ -227,7 +242,11 @@
       var cv = document.createElement("canvas"); cv.className = "pdf-page"; holder.appendChild(cv);
       var ov = document.createElement("canvas"); ov.className = "draw-layer"; holder.appendChild(ov);
       var sk = document.createElement("div");
-      sk.className = "skel"; sk.style.cssText = "position:absolute;inset:0;border-radius:6px;min-height:12rem";
+      sk.className = "skel"; sk.style.cssText = "position:absolute;inset:0;border-radius:6px;min-height:12rem;display:grid;place-items:center";
+      var skl = document.createElement("span");
+      skl.className = "mono muted"; skl.style.cssText = "font-size:.68rem;letter-spacing:.04em";
+      skl.textContent = "Loading page " + p + "…";
+      sk.appendChild(skl);
       holder.appendChild(sk);
       stage.appendChild(holder);
       bindDraw(ov, p);
@@ -243,8 +262,12 @@
       })(p, holder);
     }
     document.getElementById("pg-input").value = page;
-    /* First pages render NOW (never blank), rest lazy-load on scroll. */
-    await renderPage(1);
+    /* First pages render NOW (never blank), rest lazy-load on scroll. Never
+       let a huge scan block the whole viewer from becoming usable. */
+    await Promise.race([
+      renderPage(1),
+      new Promise(function (resolve) { setTimeout(resolve, 10000); })
+    ]);
     if (pdf.numPages >= 2) renderPage(2);
     if (pdf.numPages >= 3) renderPage(3);
   }
@@ -274,23 +297,35 @@
       var pg = await pdf.getPage(p);
       var s = scale === null ? fitScale(pg, stageW || 700) : scale;
       var vp = pg.getViewport({ scale: s });
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      /* Scanned notes decode one huge image per page; dpr 1.5 is plenty and
+         materially faster than 2 on low-end laptops. */
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       var cv = holder.querySelector("canvas.pdf-page");
       cv.width = Math.round(vp.width * dpr); cv.height = Math.round(vp.height * dpr);
       cv.style.width = "100%"; cv.style.height = "auto";
       holder.style.aspectRatio = vp.width + " / " + vp.height;
-      await pg.render({ canvasContext: cv.getContext("2d"), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined }).promise;
+      var task = pg.render({ canvasContext: cv.getContext("2d"), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined });
+      /* A 40 MB scan can sit on a range request forever; never leave the
+         skeleton shimmering over a page that will not arrive. */
+      await Promise.race([
+        task.promise,
+        new Promise(function (_, reject) { setTimeout(function () { reject(new Error("render timeout")); }, 25000); })
+      ]);
       var sk = holder.querySelector(".skel");
       if (sk) sk.remove();
       paintDraw(p);
       trackPage(p);
     } catch (e) {
       rendered[p] = null;
+      var skel = holder.querySelector(".skel");
+      if (skel) skel.remove();
       if (!holder.querySelector(".empty")) {
         var err = document.createElement("div");
         err.className = "empty"; err.style.border = "0";
-        err.innerHTML = "<p>Page " + p + " wouldn't render. Try zoom Fit.</p>";
+        err.innerHTML = '<p>Page ' + p + ' is taking too long. <button class="btn btn-secondary btn-sm" data-retry="' + p + '">Retry page</button></p>';
         holder.appendChild(err);
+        var rb = err.querySelector("[data-retry]");
+        if (rb) rb.addEventListener("click", function () { err.remove(); renderPage(p); });
       }
     }
   }

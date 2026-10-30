@@ -136,7 +136,11 @@
       var ok = await api.isFreePreview(courseId, contentId).catch(function () { return false; });
       if (!ok) {
         ui.toast("Sign in required", "First lecture is free — sign in for the rest");
-        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent("play.html?course=" + courseId + "&content=" + contentId); }, 700);
+        var selfNext = "play.html?course=" + courseId + "&content=" + contentId +
+          "&folder=" + encodeURIComponent(folderId) +
+          (qp("vdc_id") ? "&vdc_id=" + encodeURIComponent(qp("vdc_id")) : "") +
+          (hintedTitle ? "&title=" + encodeURIComponent(hintedTitle) : "");
+        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(selfNext); }, 700);
         return;
       }
       ui.toast("Free preview", "First lecture is free");
@@ -501,6 +505,11 @@
       var items = await api.content(courseId, folderId);
       var files = items.filter(function (x) { return x.type === "file"; });
       var i = files.findIndex(function (f) { return String(f.entity_id) === String(contentId); });
+      /* Last-resort title: the folder listing knows this file's real name. */
+      if (i >= 0 && files[i].title && (!play || !play.title) && !hintedTitle) {
+        setTitle(files[i].title);
+        SK.fb.presenceBeat(undefined, "watching · " + files[i].title);
+      }
       var next = i >= 0 ? files.slice(i + 1, i + 4) : files.slice(0, 3);
       host.innerHTML = next.length ? "" : '<p class="muted">End of this folder. 🎉</p>';
       next.forEach(function (f) {
