@@ -216,7 +216,8 @@
         if (ok) { ui.toast("Free preview", "First lecture is free"); open(); }
       else {
         ui.toast("Sign in required", "First lecture is free — sign in for the rest");
-        var nextPage = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id;
+        var nextPage = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id +
+          "&folder=" + encodeURIComponent(pathIds.length ? pathIds[pathIds.length - 1] : "0");
         if (it.data && it.data.vdc_id) nextPage += "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id));
         nextPage += "&title=" + encodeURIComponent(it.title || "");
         setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(nextPage); }, 600);
