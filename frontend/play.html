@@ -99,6 +99,19 @@
   var courseId = qp("course") || qp("courseId") || "", contentId = qp("content") || qp("contentId") || "", folderId = qp("folder") || "0";
   var user = null, play = null, hls = null;
   var video = document.getElementById("video");
+  /* Title resolution: URL hint (from the content grid) -> cached list item ->
+     backend payload -> generic fallback. Videos come from /vc/{vdc_id}, which
+     returns no title, so the hint is usually what names the lecture. */
+  var cachedItem = null;
+  try { cachedItem = JSON.parse(sessionStorage.getItem("player_" + courseId + "_" + contentId) || "null"); } catch (e) { cachedItem = null; }
+  var hintedTitle = String(qp("title") || (cachedItem && cachedItem.title) || "").trim();
+  function setTitle(t) {
+    var name = String(t || "").trim();
+    if (!name) return;
+    document.getElementById("doc-title").textContent = name;
+    document.title = "StudiKitEZ — " + name;
+  }
+  if (hintedTitle) setTitle(hintedTitle);
   ui.boot({ status: "Loading lecture…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
@@ -131,26 +144,53 @@
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
       var vdcId = qp("vdc_id") || "";
-      play = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId);
+      play = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle);
       console.log("[PLAY] API result:", play);
-      if (play && play.redirect && play.url) {
-        location.href = play.url;
-        return;
-      }
       if (!play || !play.file_url) throw new Error(play && play.error ? play.error : "No video URL returned");
     } catch (e) {
       console.error("[PLAY] Failed:", e.message);
       location.href = "maintenance.html?reason=" + encodeURIComponent(e.message || "playback_failed");
       return;
     }
-    if (play.file_type === 1) { location.replace("pdf.html?course=" + courseId + "&content=" + contentId); return; }
-    console.log("[PLAY] file_url:", play.file_url, "file_type:", play.file_type);
-    document.getElementById("doc-title").textContent = play.title || "Lecture";
-    document.title = "StudiKitEZ — " + (play.title || "Lecture");
-    SK.fb.presenceBeat(undefined, "watching · " + (play.title || "lecture"));
+    /* Video was requested but the source turned out to be a PDF — hand off. */
+    if (Number(play.file_type) === 1 && !/\.(m3u8|mp4|mpd|webm)(\?|#|$)/i.test(play.file_url || "")) {
+      location.replace("pdf.html?course=" + courseId + "&content=" + contentId +
+        (qp("vdc_id") ? "&vdc_id=" + encodeURIComponent(qp("vdc_id")) : "") +
+        "&title=" + encodeURIComponent(play.title || hintedTitle || ""));
+      return;
+    }
+    var finalTitle = String(play.title || hintedTitle || "Lecture").trim();
+    console.log("[PLAY] file_url:", play.file_url, "file_type:", play.file_type, "title:", finalTitle);
+    setTitle(finalTitle);
+    SK.fb.presenceBeat(undefined, "watching · " + finalTitle);
     attach(play.file_url);
     loadUpNext(); loadNotes(); loadChat(); setInterval(loadChat, 8000);
     SK.ads.render();
+  }
+
+  /* Inline player error — never hijack the page once playback is possible. */
+  function playerError(msg) {
+    var veil = document.getElementById("veil");
+    if (veil) veil.classList.add("hide");
+    var stage = document.getElementById("stage");
+    var box = document.getElementById("stage-error");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "stage-error";
+      box.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center;background:var(--surface);z-index:5";
+      stage.appendChild(box);
+    }
+    box.innerHTML = '<h2 style="margin:0">Stream hiccup</h2>' +
+      '<p class="muted" style="margin:0;max-width:32ch">' + ui.esc(msg || "The lecture stream stopped responding.") + "</p>" +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">' +
+      '<button class="btn btn-primary btn-sm" id="stage-retry">Resume</button>' +
+      '<button class="btn btn-secondary btn-sm" id="stage-reload">Reload</button></div>';
+    document.getElementById("stage-retry").addEventListener("click", function () {
+      if (hls) { try { hls.startLoad(); } catch (e) {} }
+      else if (play && play.file_url) { video.load(); video.play().catch(function () {}); }
+      box.remove();
+    });
+    document.getElementById("stage-reload").addEventListener("click", function () { location.reload(); });
   }
 
   function attach(url) {
@@ -162,8 +202,21 @@
       return;
     }
     video.style.display = "block";
+
+    /* Streams are long EVENT playlists on CloudFront; start at the beginning
+       and keep a big back buffer so seeking backwards does not re-fetch. */
     if (/\.m3u8($|\?)/.test(url) && window.Hls && Hls.isSupported()) {
-      hls = new Hls({ maxBufferLength: 60 });
+      hls = new Hls({
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        backBufferLength: 90,
+        startPosition: 0,
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
+        fragLoadingMaxRetry: 6
+      });
+      var recovered = 0;
       hls.on(Hls.Events.MANIFEST_PARSED, function () {
         var box = document.getElementById("quals");
         box.innerHTML = '<button class="qpill on" data-q="-1">Auto</button>' +
@@ -174,15 +227,42 @@
             box.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
           });
         });
+        console.log("[PLAY] manifest parsed, levels:", (hls.levels || []).length);
       });
+      /* hls.js reports MANY non-fatal errors (level switches, buffer holes,
+         segment retries) that it recovers from on its own. Only fatal ones
+         need us, and even then we retry before showing an error. */
       hls.on(Hls.Events.ERROR, function (ev, data) {
-        console.error("[PLAY] HLS ERROR:", ev, data);
-        location.href = "maintenance.html?reason=" + encodeURIComponent("hls_error");
+        var detail = (data && data.details) || "unknown";
+        var fatal = !!(data && data.fatal);
+        console.warn("[PLAY] HLS error:", (data && data.type) || "", detail, "fatal=" + fatal);
+        if (!fatal) return;
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recovered < 2) {
+          recovered++;
+          console.warn("[PLAY] recovering media error, attempt " + recovered);
+          setTimeout(function () { try { hls.recoverMediaError(); } catch (e) {} }, 300);
+          return;
+        }
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && recovered < 3) {
+          recovered++;
+          console.warn("[PLAY] retrying network load, attempt " + recovered);
+          setTimeout(function () { try { hls.startLoad(); } catch (e) {} }, 800 * recovered);
+          return;
+        }
+        playerError("The lecture stream stopped. Tap Resume to continue from here.");
       });
-      hls.loadSource(url); hls.attachMedia(video);
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      video.addEventListener("error", function () {
+        if (video.error) playerError("This lecture could not be decoded by your browser.");
+      });
     } else {
       console.log("[PLAY] Setting direct video.src:", url);
       video.src = url;
+      video.load();
+      video.addEventListener("error", function () {
+        playerError("This file could not be loaded. Check your connection and tap Resume.");
+      });
       document.getElementById("quals").innerHTML = '<span class="mono muted" style="font-size:.7rem">progressive · auto</span>';
     }
   }
@@ -279,15 +359,6 @@
   video.addEventListener("playing", function () { document.getElementById("veil").classList.add("hide"); });
   video.addEventListener("waiting", function () { document.getElementById("veil").classList.remove("hide"); });
   video.addEventListener("canplay", function () { document.getElementById("veil").classList.add("hide"); });
-  document.getElementById("stage").addEventListener("dblclick", function (e) {
-    if (video.style.display === "none") return;
-    if (e.target.closest && e.target.closest(".ctl, .seek-flash")) return;
-    var r = this.getBoundingClientRect();
-    var x = (e.clientX - r.left) / r.width;
-    if (x < 0.35) skipBy(-10, 22);
-    else if (x > 0.65) skipBy(10, 78);
-    else document.getElementById("play-btn").click();
-  });
   function seekTo(clientX) {
     var r = document.getElementById("seek").getBoundingClientRect();
     var p = Math.min(Math.max(0, (clientX - r.left) / r.width), 1);
@@ -436,9 +507,12 @@
         var b = document.createElement("button");
         b.className = "btn btn-secondary btn-sm btn-block";
         b.style.marginTop = ".5rem"; b.style.justifyContent = "flex-start";
-        b.textContent = ((f.data && f.data.file_type === 1) ? "▤ " : "▶ ") + f.title;
+        b.textContent = ((f.data && Number(f.data.file_type) === 1) ? "▤ " : "▶ ") + f.title;
         b.addEventListener("click", function () {
-          location.href = ((f.data && f.data.file_type === 1) ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + f.entity_id + "&folder=" + encodeURIComponent(folderId);
+          var page = (Number(f.data && f.data.file_type) === 1) ? "pdf.html" : "play.html";
+          var vdc = (f.data && f.data.vdc_id) ? "&vdc_id=" + encodeURIComponent(String(f.data.vdc_id)) : "";
+          location.href = page + "?course=" + courseId + "&content=" + f.entity_id +
+            "&folder=" + encodeURIComponent(folderId) + vdc + "&title=" + encodeURIComponent(f.title || "");
         });
         host.appendChild(b);
       });

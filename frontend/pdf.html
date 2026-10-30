@@ -80,7 +80,21 @@
   var ui = SK.ui, api = SK.api, fb = SK.fb;
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
   var courseId = qp("course") || qp("courseId") || "", contentId = qp("content") || qp("contentId") || "", vdcId = qp("vdc_id") || "";
-  var user = null, pdfUrl = "", pdfTitle = "Document", pdf = null, page = 1, scale = null;
+  var user = null, pdfUrl = "", pdf = null, page = 1, scale = null;
+  /* Title comes from the grid link, else the cached list item, else the
+     backend payload (PDF URLs carry the real filename). */
+  var cachedItem = null;
+  try { cachedItem = JSON.parse(sessionStorage.getItem("player_" + courseId + "_" + contentId) || "null"); } catch (e) { cachedItem = null; }
+  var hintedTitle = String(qp("title") || (cachedItem && cachedItem.title) || "").trim();
+  var pdfTitle = hintedTitle || "Document";
+  function setDocTitle(t) {
+    var name = String(t || "").trim();
+    if (!name) return;
+    pdfTitle = name;
+    document.getElementById("doc-title").textContent = name;
+    document.title = "StudiKitEZ — " + name;
+  }
+  if (hintedTitle) setDocTitle(hintedTitle);
   ui.boot({ status: "Opening notes…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
@@ -106,27 +120,52 @@
     var d;
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
-      d = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId);
+      d = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle);
     }
     catch (e) { fail(e.message || e); return; }
-    if (d && d.redirect && d.url) { location.href = d.url; return; }
-    if (d.file_type !== undefined && d.file_type !== 1) { location.replace("play.html?course=" + courseId + "&content=" + contentId); return; }
-    pdfTitle = d.title || pdfTitle; pdfUrl = d.file_url;
-    document.getElementById("doc-title").textContent = pdfTitle;
-    document.title = "StudiKitEZ — " + pdfTitle;
-  SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
+    /* Only hand off to the video player when the source really is a video.
+       A null file_type (videos come from /vc/{vdc_id}) must NOT bounce PDFs. */
+    var looksVideo = /\.(m3u8|mp4|mpd|webm|m4v|mov)(\?|#|$)/i.test(d.file_url || "");
+    if (Number(d.file_type) === 2 || (looksVideo && Number(d.file_type) !== 1)) {
+      location.replace("play.html?course=" + courseId + "&content=" + contentId +
+        (vdcId ? "&vdc_id=" + encodeURIComponent(vdcId) : "") +
+        "&title=" + encodeURIComponent(d.title || hintedTitle || ""));
+      return;
+    }
+    setDocTitle(d.title || hintedTitle || "Document");
+    pdfUrl = d.file_url;
+    SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
     try {
-      pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise;
+      try {
+        pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise;
+      } catch (first) {
+        /* Range/CORS/worker failures: pull the bytes once and parse locally. */
+        console.warn("[PDF] direct load failed, retrying as buffer:", first && first.message);
+        var resp = await fetch(pdfUrl);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        pdf = await pdfjsLib.getDocument({ data: await resp.arrayBuffer() }).promise;
+      }
       await renderAll();
       if (user) fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: pdfTitle, type: "pdf", done: true }).catch(function () {});
       loadNotes();
       SK.ads.render();
       ui.load(false);
-    } catch (e) { fail("Could not render this document — try Download."); }
+    } catch (e) {
+      fail("Could not render this document — tap Retry, or use Download.");
+    }
   }
   function fail(msg) {
     console.error("[PDF] Failed:", msg);
-    location.href = "maintenance.html?reason=" + encodeURIComponent(msg || "pdf_failed");
+    var stage = document.getElementById("pdf-stage");
+    if (stage) {
+      stage.innerHTML = '<div class="empty" style="border:0"><h3>Couldn\'t open this file</h3>' +
+        "<p>" + ui.esc(String(msg || "Document unavailable")) + "</p>" +
+        '<div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">' +
+        '<button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'pdf-dl\').click()">Download</button>' +
+        "</div></div>";
+    }
+    ui.load(false);
   }
   document.getElementById("pdf-open").addEventListener("click", function () { if (pdfUrl) window.open(pdfUrl, "_blank", "noopener"); });
   document.getElementById("pdf-dl").addEventListener("click", async function () {

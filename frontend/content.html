@@ -189,7 +189,7 @@
     return el;
   }
   function fileCard(it, i) {
-    var isPdf = it.data && it.data.file_type === 1;
+    var isPdf = Number(it.data && it.data.file_type) === 1;
     var th = it.data && typeof it.data.thumbnail === "string" && it.data.thumbnail.indexOf("http") === 0 ? it.data.thumbnail : "";
     var dur = api.fmtDur(it.data && it.data.duration);
     var el = document.createElement("article");
@@ -209,7 +209,7 @@
         var folder = pathIds.length ? pathIds[pathIds.length - 1] : "0";
         var vdcParam = "";
         try { if (it.data && it.data.vdc_id) vdcParam = "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id)); } catch (e) {}
-        location.href = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + "&folder=" + encodeURIComponent(folder) + vdcParam;
+        location.href = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id + "&folder=" + encodeURIComponent(folder) + vdcParam + "&title=" + encodeURIComponent(it.title || "");
       }
       if (user) { open(); return; }
       api.isFreePreview(courseId, it.entity_id).then(function (ok) {
@@ -218,6 +218,7 @@
         ui.toast("Sign in required", "First lecture is free — sign in for the rest");
         var nextPage = (isPdf ? "pdf.html" : "play.html") + "?course=" + courseId + "&content=" + it.entity_id;
         if (it.data && it.data.vdc_id) nextPage += "&vdc_id=" + encodeURIComponent(String(it.data.vdc_id));
+        nextPage += "&title=" + encodeURIComponent(it.title || "");
         setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(nextPage); }, 600);
       }
       });
@@ -242,7 +243,7 @@
   function renderGrid() {
     var folders = items.filter(function (x) { return x.type === "folder"; });
     var files = items.filter(function (x) { return x.type === "file"; });
-    var vids = files.filter(function (f) { return !(f.data && f.data.file_type === 1); }).length;
+    var vids = files.filter(function (f) { return !(f.data && Number(f.data.file_type) === 1); }).length;
     var pdfs = files.length - vids;
     document.getElementById("course-meta").textContent = folders.length + " folders · " + vids + " videos · " + pdfs + " pdfs";
     document.getElementById("ov-grid").innerHTML =

@@ -78,14 +78,25 @@ window.SK.api = (function () {
     }
     return attempt();
   }
-  function play(courseId, contentId, key, deviceId, headers, vdcId) {
-    return req("GET", "/api/media/play", { params: { course_id: String(courseId), content_id: String(contentId), key: key, device_id: deviceId, vdc_id: vdcId || "" }, headers: headers })
-      .then(function (j) {
-      if (j && j.redirect && j.url) return { redirect: true, url: j.url };
-      var data = j.decryptedData || j;
-      if (!data || !data.file_url) throw new Error(j.error || j.reason || "No video URL returned");
-      return data;
-    });
+  function play(courseId, contentId, key, deviceId, headers, vdcId, title) {
+    var attempts = 0, maxAttempts = 3;
+    function attempt() {
+      return req("GET", "/api/media/play", { params: { course_id: String(courseId), content_id: String(contentId), key: key, device_id: deviceId, vdc_id: vdcId || "", title: title || "" }, headers: headers })
+        .then(function (j) {
+          var data = j.decryptedData || j;
+          if (!data || !data.file_url) throw new Error(j.error || j.reason || "No video URL returned");
+          return data;
+        }).catch(function (e) {
+          attempts++;
+          var msg = String(e.message || "");
+          /* Vendor rate-limits (429) and WAF blips (502/504) are transient. */
+          if ((msg.indexOf("429") >= 0 || msg.indexOf("502") >= 0 || msg.indexOf("504") >= 0 || msg.indexOf("timed out") >= 0) && attempts < maxAttempts) {
+            return new Promise(function (resolve) { setTimeout(resolve, attempts * 1200); }).then(attempt);
+          }
+          throw e;
+        });
+    }
+    return attempt();
   }
   function live(courseId, type, key, deviceId, headers) {
     return req("GET", "/api/media/live", { params: { course_id: String(courseId), type: String(type || "1"), key: key, device_id: deviceId }, headers: headers })
