@@ -1,8 +1,7 @@
-/* Public runtime config only. Browser keys must reach the client to init Firebase;
-   real protection is Firestore rules + Firebase API-key restrictions + App Check.
-   Values below are public browser identifiers (same as the old committed env.js);
-   every field is overridable via env without redeploying code. */
-const { sendJson, sendOptions, requireMethod } = require("../lib/http");
+/* Public runtime config ONLY.
+   Browser Firebase identifiers must be public for the SDK; never put secrets,
+   admin allowlists or session keys here. Admin checks happen in /api/auth/is-admin. */
+const { BRAND, VERSION, sendJson, sendOptions, requireMethod, rateLimit } = require("../lib/http");
 
 const DEFAULTS = {
   SMEXGOD: {
@@ -22,13 +21,14 @@ const DEFAULTS = {
     appId: "1:730581787323:web:934a0c33400c0b8c14bf9e",
     measurementId: "G-X0ZH9VYZ9B",
   },
-    SITE_URL: "https://studikitesz.pages.dev",
+  SITE_URL: "https://studikitesz.pages.dev",
   TELEGRAM_URL: "https://t.me/studikitez",
 };
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["GET"])) return;
+  if (!rateLimit(req, res, "config", 120, 60_000)) return;
   try {
     const e = process.env;
     const pick = (v, d) => (v === undefined || v === "" ? d : v);
@@ -46,25 +46,18 @@ module.exports = async function handler(req, res) {
         authDomain: pick(e.FIREBASE_STUDIKI_AUTH_DOMAIN, DEFAULTS.STUDIKI.authDomain),
         projectId: pick(e.FIREBASE_STUDIKI_PROJECT_ID, DEFAULTS.STUDIKI.projectId),
         storageBucket: pick(e.FIREBASE_STUDIKI_STORAGE_BUCKET, DEFAULTS.STUDIKI.storageBucket),
-        messagingSenderId: pick(e.FIREBASE_STUDIKI_SENDER_ID, DEFAULTS.STUDIKI.senderId || DEFAULTS.STUDIKI.messagingSenderId),
+        messagingSenderId: pick(e.FIREBASE_STUDIKI_SENDER_ID, DEFAULTS.STUDIKI.messagingSenderId),
         appId: pick(e.FIREBASE_STUDIKI_APP_ID, DEFAULTS.STUDIKI.appId),
         measurementId: pick(e.FIREBASE_STUDIKI_MEASUREMENT_ID, DEFAULTS.STUDIKI.measurementId),
         databaseURL: pick(e.FIREBASE_STUDIKI_DATABASE_URL, ""),
       },
       SITE_URL: pick(e.SITE_URL, DEFAULTS.SITE_URL),
       TELEGRAM_URL: pick(e.TELEGRAM_URL, DEFAULTS.TELEGRAM_URL),
-      ADMIN_EMAILS: pick(e.ADMIN_EMAILS, ""),
-      ADSENSE_CLIENT: pick(e.ADSENSE_CLIENT, "ca-pub-7694333485336687"),
-      ADSENSE_SLOTS: {
-        banner: pick(e.ADSENSE_SLOT_BANNER, "1840322518"),
-        feed: pick(e.ADSENSE_SLOT_FEED, "3696329666"),
-        inarticle: pick(e.ADSENSE_SLOT_INARTICLE, "6026979535"),
-        multiplex: pick(e.ADSENSE_SLOT_MULTIPLEX, "7502133723"),
-      },
-      ADSENSE_FEED_KEY: pick(e.ADSENSE_FEED_KEY, "-fb+5w+4e-db+86"),
+      BATCHES_URL: "https://nt.studybeepro.site/batches.json",
+      BRAND: { name: BRAND, engine: `${BRAND} Engine`, version: VERSION },
     };
     return sendJson(req, res, 200, config);
   } catch (err) {
-    return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Config unavailable" });
+    return sendJson(req, res, err.status || 500, { success: false, error: "Config unavailable" });
   }
 };

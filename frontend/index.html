@@ -67,11 +67,6 @@
     </div>
   </section>
 
-  <section id="announcements" style="margin-top:1.6rem;display:none" aria-label="Announcements">
-    <div class="section-title"><h2>Announcements</h2></div>
-    <div class="ann-strip" id="ann-list"></div>
-  </section>
-
   <div class="section-title reveal"><h2>Explore batches</h2><span id="count">—</span><span class="link" id="show-all">Show all →</span></div>
   <div class="chip-row category reveal" id="chips" role="group" aria-label="Filter by category"></div>
   <div class="cards" id="grid" style="margin-top:1rem" aria-live="polite"></div>
@@ -90,26 +85,8 @@
   var ui = SK.ui, api = SK.api, fb = SK.fb;
   var all = [], shown = 24, filter = "", query = "";
   ui.boot({ status: "Loading catalog…" }).catch(function () {});
-  ui.nav(); ui.telegram(); ui.telegramNag(); ui.announcePopup();
+  ui.nav(); ui.telegram(); ui.telegramNag();
   ui.skeleton(document.getElementById("grid"), 6);
-
-  fb.announcements(6).then(function (list) {
-    if (!list.length) return;
-    var host = document.getElementById("ann-list");
-    document.getElementById("announcements").style.display = "";
-    list.forEach(function (a) {
-      var el = document.createElement("div");
-      el.className = "ann-item anim-rise";
-      el.innerHTML = '<div style="min-width:0;flex:1"><div class="a-title" style="font-weight:700;font-size:.88rem"></div><div class="a-body muted" style="font-size:.82rem;white-space:pre-wrap"></div></div>';
-      el.querySelector(".a-title").textContent = a.title;
-      el.querySelector(".a-body").textContent = a.body || "";
-      if (a.link) {
-        var b = document.createElement("a"); b.className = "btn btn-secondary btn-sm"; b.textContent = "Open →"; b.href = a.link; b.style.marginTop = ".5rem";
-        el.querySelector("div").appendChild(b);
-      }
-      host.appendChild(el);
-    });
-  }).catch(function () {});
 
   var cats = [
     { id: "", label: "All batches" },

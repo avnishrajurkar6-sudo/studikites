@@ -5,8 +5,18 @@ window.SK.fb = (function () {
   var S = { ready: false, sAuth: null, sDb: null, gAuth: null, gDb: null, anon: null };
   var V = "https://www.gstatic.com/firebasejs/11.6.1/";
 
+  var initPromise = null;
   async function ensure() {
     if (S.ready) return S;
+    if (!initPromise) initPromise = initFirebase();
+    /* Never let a slow Firebase/network block the whole UI. Callers degrade
+       gracefully; a later call retries the same in-flight initialisation. */
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error("Firebase unavailable")); }, 9000);
+      initPromise.then(function (v) { clearTimeout(timer); resolve(v); }, function (e) { clearTimeout(timer); reject(e); });
+    });
+  }
+  async function initFirebase() {
     var cfg = await window.SK.api.getConfig();
     var app = await import(V + "firebase-app.js");
     var auth = await import(V + "firebase-auth.js");
@@ -29,7 +39,8 @@ window.SK.fb = (function () {
   function phoneLocal() {
     try {
       var t = localStorage.getItem("studybee_token"), m = localStorage.getItem("studybee_mobile");
-      if (t && m) return { uid: "phone_" + m, mobile: m, email: "", displayName: "+91 " + m, provider: "phone", token: t };
+      var session = localStorage.getItem("sk_session");
+      if (t && m && session) return { uid: "phone_" + m, mobile: m, email: "", displayName: "+91 " + m, provider: "phone", token: t };
     } catch (e) {}
     return null;
   }
@@ -49,6 +60,11 @@ window.SK.fb = (function () {
   }
 
   async function userDoc(uid) {
+    var phone = phoneLocal();
+    if (phone && phone.uid === uid) {
+      var result = await window.SK.api.phoneProfile("get");
+      return result && result.exists ? result.profile : null;
+    }
     await ensure();
     var s = await S._fs.getDoc(S._fs.doc(S.sDb, "users", uid));
     return s.exists() ? s.data() : null;
@@ -64,6 +80,13 @@ window.SK.fb = (function () {
   async function requireLogin(next) {
     var u = await currentUser();
     if (!u) { location.href = "login.html?next=" + encodeURIComponent(next || "dashboard.html"); throw new Error("redirect-login"); }
+    if (u.provider === "phone") {
+      var phoneDoc = await userDoc(u.uid);
+      if (phoneDoc && phoneDoc.banned === true) { location.href = "banned.html"; throw new Error("banned"); }
+      if (!phoneDoc) await syncPhone(u.mobile);
+      startBanWatch(u.uid);
+      return u;
+    }
     await ensure();
     var ref = S._fs.doc(S.sDb, "users", u.uid), snap = await S._fs.getDoc(ref);
     if (snap.exists() && snap.data().banned === true) { location.href = "banned.html"; throw new Error("banned"); }
@@ -92,6 +115,8 @@ window.SK.fb = (function () {
     try { return localStorage.getItem("sk_session") || ""; } catch (e) { return ""; }
   }
   async function idToken() {
+    var user = await currentUser();
+    if (!user || user.provider === "phone") return "";
     await ensure();
     if (S.sAuth && S.sAuth.currentUser) return S.sAuth.currentUser.getIdToken();
     return "";
@@ -107,10 +132,7 @@ window.SK.fb = (function () {
   }
 
   async function syncPhone(mobile) {
-    await ensure();
-    var ref = S._fs.doc(S.sDb, "users", "phone_" + mobile), snap = await S._fs.getDoc(ref);
-    if (!snap.exists()) await S._fs.setDoc(ref, { mobile: mobile, email: "", displayName: "", provider: "phone", banned: false, createdAt: S._fs.serverTimestamp(), lastLoginAt: S._fs.serverTimestamp() });
-    else await S._fs.setDoc(ref, { lastLoginAt: S._fs.serverTimestamp() }, { merge: true });
+    await window.SK.api.phoneProfile("sync", { mobile: mobile });
   }
   async function syncGoogle(fbUser) {
     await ensure();
@@ -119,20 +141,84 @@ window.SK.fb = (function () {
     else await S._fs.setDoc(ref, { lastLoginAt: S._fs.serverTimestamp() }, { merge: true });
   }
   async function saveProfile(mobile, name, email) {
-    await ensure();
-    var ref = S._fs.doc(S.sDb, "users", "phone_" + mobile), snap = await S._fs.getDoc(ref);
-    var cur = snap.exists() ? snap.data() : {}, up = {};
-    if (name && !(cur.displayName || "").trim()) up.displayName = name;
-    if (email && !(cur.email || "").trim()) up.email = email;
-    if (Object.keys(up).length) await S._fs.setDoc(ref, up, { merge: true });
+    await window.SK.api.phoneProfile("save-profile", { name: name, email: email });
   }
   async function checkPhone(mobile) {
+    var profile = await userDoc("phone_" + mobile);
+    if (!profile) return { exists: false, hasName: false };
+    return { exists: true, hasName: !!String(profile.displayName || "").trim() };
+  }
+
+  /* ---------- onboarding ---------- */
+  /* Returns the onboarding object when complete, false when definitely not
+     complete, and null when we couldn't tell (offline) — the UI only redirects
+     on an explicit false. */
+  async function prefs(uid, force) {
+    if (!uid) return false;
+    var ck = "sk_prefs_" + uid;
+    if (!force) {
+      try { var raw = sessionStorage.getItem(ck); if (raw) return JSON.parse(raw); } catch (e) {}
+    }
     try {
+      var d = await userDoc(uid);
+      var o = d && d.onboarding;
+      var out = (o && o.done === true) ? o : false;
+      /* Firestore write may have failed while offline — never trap the learner
+         in an onboarding redirect loop when their device already has the data. */
+      if (!out) {
+        try {
+          if (localStorage.getItem("sk_onboarded_uid") === uid) out = { done: true, batches: myBatches(), offline: true };
+        } catch (e2) {}
+      }
+      try { sessionStorage.setItem(ck, JSON.stringify(out)); } catch (e) {}
+      return out;
+    } catch (e) {
+      try {
+        if (localStorage.getItem("sk_onboarded_uid") === uid) {
+          var mine = myBatches();
+          return { done: true, batches: mine, offline: true };
+        }
+      } catch (e2) {}
+      return null;
+    }
+  }
+  async function saveOnboarding(uid, data) {
+    data = data || {};
+    var list = (data.batches || []).map(function (x) { return String(x); }).filter(Boolean).slice(0, 12);
+    var payload = {
+      done: true,
+      batches: list,
+      mainBatch: list[0] || "",
+      goal: String(data.goal || "board").slice(0, 40),
+      dailyMinutes: Math.max(10, Math.min(240, Number(data.dailyMinutes) || 30)),
+      reminders: data.reminders !== false,
+      level: String(data.level || "").slice(0, 40),
+      updatedAt: Date.now()
+    };
+    var phone = phoneLocal();
+    if (phone && phone.uid === uid) {
+      await window.SK.api.phoneProfile("save-onboarding", { data: payload });
+    } else {
       await ensure();
-      var snap = await S._fs.getDoc(S._fs.doc(S.sDb, "users", "phone_" + mobile));
-      if (!snap.exists()) return { exists: false, hasName: false };
-      return { exists: true, hasName: !!((snap.data().displayName || "").trim()) };
-    } catch (e) { return { exists: false, hasName: false }; }
+      await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid), { onboarding: payload, updatedAt: Date.now() }, { merge: true });
+    }
+    try {
+      localStorage.setItem("sk_onboarded_uid", uid);
+      localStorage.setItem("sk_my_batches", JSON.stringify(list));
+      localStorage.setItem("sk_sk_goal", payload.goal);
+      localStorage.setItem("sk_daily_minutes", String(payload.dailyMinutes));
+      sessionStorage.setItem("sk_prefs_" + uid, JSON.stringify(payload));
+    } catch (e) {}
+    return payload;
+  }
+  function myBatches() {
+    try { return JSON.parse(localStorage.getItem("sk_my_batches") || "[]"); } catch (e) { return []; }
+  }
+  function mainBatch() {
+    try { return String(localStorage.getItem("sk_main_batch") || myBatches()[0] || ""); } catch (e) { return ""; }
+  }
+  function setMainBatch(id) {
+    try { localStorage.setItem("sk_main_batch", String(id || "")); } catch (e) {}
   }
 
   function seg() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
@@ -146,11 +232,80 @@ window.SK.fb = (function () {
   /* progress / xp / streak */
   var progCache = {};
   function dayKey(d) { d = d || new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  var activitySyncAt = 0;
+  function localActivity() {
+    var out = {};
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf("sk_activity_") === 0) {
+          var day = k.slice(12);
+          var n = parseInt(localStorage.getItem(k) || "0", 10) || 0;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(day) && n > 0) out[day] = n;
+        }
+      }
+    } catch (e) {}
+    return out;
+  }
   function activity(n) {
     try {
       var k = "sk_activity_" + dayKey(), c = parseInt(localStorage.getItem(k) || "0", 10) || 0;
       localStorage.setItem(k, String(Math.min(999, c + n)));
+      var today = new Date(), cutoff = new Date(today.getTime() - 400 * 86400000);
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf("sk_activity_") === 0) {
+          var d = new Date(key.slice(12) + "T00:00:00");
+          if (d < cutoff) { localStorage.removeItem(key); i--; }
+        }
+      }
     } catch (e) {}
+  }
+  /* Merge device activity with the account copy. Local wins on conflict so a
+     phone that was offline still keeps its streak when it reconnects. */
+  async function activityMap(uid, days) {
+    var out = localActivity();
+    if (uid) {
+      try {
+        var d = await userDoc(uid);
+        var a = (d && d.activity) || {};
+        Object.keys(a).forEach(function (k) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+          out[k] = Math.max(out[k] || 0, Number(a[k]) || 0);
+        });
+      } catch (e) {}
+    }
+    var keep = {}, n = Math.max(1, days || 120), today = new Date();
+    for (var i = 0; i < n; i++) {
+      var dd = new Date(today); dd.setDate(dd.getDate() - i);
+      var k = dayKey(dd);
+      if (out[k]) keep[k] = out[k];
+    }
+    return keep;
+  }
+  function syncActivity(uid, force) {
+    if (!uid) return Promise.resolve(false);
+    if (!force && Date.now() - activitySyncAt < 120000) return Promise.resolve(false);
+    activitySyncAt = Date.now();
+    return ensure().then(function () {
+      var ref = S._fs.doc(S.sDb, "users", uid);
+      return S._fs.getDoc(ref).then(function (snap) {
+        var cur = (snap.exists() && snap.data().activity) || {};
+        var local = localActivity(), merged = {}, keys = 0;
+        Object.keys(cur).forEach(function (k) { merged[k] = Number(cur[k]) || 0; });
+        Object.keys(local).forEach(function (k) {
+          var n = Number(local[k]) || 0;
+          if (n > (merged[k] || 0)) merged[k] = n;
+        });
+        /* cap history at ~13 months */
+        var cutoff = new Date(Date.now() - 400 * 86400000), out = {};
+        Object.keys(merged).forEach(function (k) {
+          if (new Date(k + "T00:00:00") >= cutoff && merged[k] > 0) { out[k] = merged[k]; keys++; }
+        });
+        if (!keys) return false;
+        return S._fs.setDoc(ref, { activity: out, activityAt: Date.now() }, { merge: true }).then(function () { return true; });
+      });
+    }).catch(function () { return false; });
   }
   async function progress(uid, courseId) {
     var ck = uid + "_" + courseId;
@@ -164,8 +319,16 @@ window.SK.fb = (function () {
     o = o || {};
     await ensure();
     var p = await progress(uid, courseId), w = p.watched || {}, old = w[contentId] || {};
-    w[contentId] = { pct: Math.max(old.pct || 0, o.pct || 0), done: old.done || !!o.done, at: Date.now(), title: o.title || "", type: o.type || "video" };
-    p.watched = w; p.lastContentId = contentId; p.lastTitle = o.title || ""; p.updatedAt = Date.now();
+    w[contentId] = {
+      pct: Math.max(old.pct || 0, o.pct || 0),
+      pos: Math.max(old.pos || 0, Number(o.pos) || 0),
+      page: Math.max(old.page || 0, Number(o.page) || 0),
+      done: old.done || !!o.done,
+      at: Date.now(),
+      title: o.title || old.title || "",
+      type: o.type || old.type || "video"
+    };
+    p.watched = w; p.lastContentId = contentId; p.lastTitle = o.title || old.title || ""; p.updatedAt = Date.now();
     await S._fs.setDoc(S._fs.doc(S.sDb, "progress", uid, "batches", String(courseId)), p, { merge: true });
     progCache[uid + "_" + courseId] = p;
     activity(o.done && !old.done ? 5 : 1);
@@ -180,7 +343,9 @@ window.SK.fb = (function () {
       }
       g.streak = st;
       await S._fs.setDoc(uref, { gamification: g }, { merge: true });
+      try { localStorage.setItem("sk_last_done", today); } catch (e) {}
     }
+    syncActivity(uid).catch(function () {});
   }
   async function gamification(uid) {
     try { var d = await userDoc(uid); return (d && d.gamification) || { xp: 0, streak: { current: 0, best: 0, lastActiveDay: "" } }; }
@@ -213,8 +378,8 @@ window.SK.fb = (function () {
         var d = snap.docs[i];
         if ((d.data() || {}).granted === true) continue;
         var uref = S._fs.doc(S.sDb, "users", me.uid), us = await S._fs.getDoc(uref);
-        var old = (us.exists() && us.data().freeUntil) || 0;
-        await S._fs.setDoc(uref, { freeUntil: Math.max(Date.now(), old) + 86400000 }, { merge: true });
+        var old = (us.exists() && (us.data().referralFreeUntil || us.data().freeUntil)) || 0;
+        await S._fs.setDoc(uref, { referralFreeUntil: Math.max(Date.now(), old) + 86400000 }, { merge: true });
         await S._fs.setDoc(S._fs.doc(S.sDb, "referral_claims", d.id), { granted: true }, { merge: true });
         n++;
       }
@@ -229,7 +394,7 @@ window.SK.fb = (function () {
       var q = S._fs.query(S._fs.collection(S.sDb, "referral_claims"), S._fs.where("by", "==", me.uid));
       var snap = await S._fs.getDocs(q); out.count = snap.size;
       var us = await S._fs.getDoc(S._fs.doc(S.sDb, "users", me.uid));
-      var fu = us.exists() ? (us.data().freeUntil || 0) : 0;
+      var fu = us.exists() ? (us.data().referralFreeUntil || us.data().freeUntil || 0) : 0;
       out.freeDaysLeft = fu > Date.now() ? Math.ceil((fu - Date.now()) / 86400000) : 0;
     } catch (e) {}
     return out;
@@ -312,45 +477,51 @@ window.SK.fb = (function () {
     if (page !== undefined) presNow.page = String(page || "").slice(0, 40);
     if (action !== undefined) presNow.action = String(action || "").slice(0, 60);
     if (!presNow.page) presNow.page = (location.pathname.split("/").pop() || "index.html");
-    currentUser().then(function (me) {
-      if (!me) return;
+    var hit = currentUser().then(function (me) {
+      if (!me) return false;
       return ensure().then(function () {
         var ref = S._fs.doc(S.sDb, "presence", me.uid);
         var payload = { name: String(me.displayName || me.email || "learner").slice(0, 50), page: presNow.page, action: presNow.action, at: Date.now() };
-        return S._fs.setDoc(ref, payload, { merge: true });
+        return S._fs.setDoc(ref, payload, { merge: true }).then(function () { return true; });
       });
-    }).catch(function () {});
+    }).catch(function () { return false; });
     if (presTimer) clearInterval(presTimer);
     presTimer = setInterval(function () {
       currentUser().then(function (me) {
-        if (!me) return clearInterval(presTimer);
+        if (!me) { clearInterval(presTimer); return; }
         return S._fs.setDoc(S._fs.doc(S.sDb, "presence", me.uid),
           { name: String(me.displayName || me.email || "learner").slice(0, 50), page: presNow.page, action: presNow.action, at: Date.now() }, { merge: true });
       }).catch(function () {});
     }, 15000);
+    return hit;
   }
 
-  /* Admin check — role from users/{uid}.role, bootstrapped via ADMIN_EMAILS. */
+  /* The server verifies ID tokens, allowlisted emails, bans, and role documents. */
+  var adminStatusCache = Object.create(null);
+  async function verifyAdmin(uid) {
+    var current = await currentUser();
+    if (!current || current.provider !== "google" || current.uid !== uid) return false;
+    var token = await idToken();
+    if (!token) throw new Error("Admin status could not be verified");
+    var result = await window.SK.api.isAdmin({ Authorization: "Bearer " + token });
+    if (!result || result.uid !== uid) throw new Error("Admin status could not be verified");
+    var admin = result.admin === true;
+    adminStatusCache[uid] = { value: admin, at: Date.now() };
+    return admin;
+  }
   async function isAdmin(uid) {
-    try {
-      var d = await userDoc(uid);
-      if (d && d.role === "admin") return true;
-      var cfg = await window.SK.api.getConfig();
-      var list = String(cfg.ADMIN_EMAILS || "").split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
-      var email = (d && d.email) || "";
-      if (email && list.indexOf(email.toLowerCase()) >= 0) {
-        await ensure();
-        await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid), { role: "admin" }, { merge: true });
-        return true;
-      }
-    } catch (e) {}
-    return false;
+    var cached = adminStatusCache[uid];
+    if (cached && Date.now() - cached.at < 15000) return cached.value;
+    try { return await verifyAdmin(uid); } catch (e) { return false; }
   }
 
   /* Messaging: DM threads + one common community thread + admin general/force. */
   function threadId(a, b) { return [a, b].sort().join("__"); }
   async function sendMsg(thread, text) {
     var me = await currentUser(); if (!me) throw new Error("signin");
+    if (me.provider === "phone") {
+      return window.SK.api.phoneProfile("send-message", { thread: thread, text: String(text).slice(0, 1000) });
+    }
     await ensure();
     var admin = await isAdmin(me.uid);
     var dispName = admin ? "Admin" : String(me.displayName || "learner").slice(0, 40);
@@ -360,13 +531,11 @@ window.SK.fb = (function () {
       { from: me.uid, name: dispName, authorRole: role, text: t, at: now });
     await S._fs.setDoc(S._fs.doc(S.sDb, "threads", thread),
       { id: thread, lastText: t.slice(0, 80), lastAt: now, lastBy: me.uid, lastRole: role, community: thread === "community" }, { merge: true });
-    if (thread !== "community") {
+    if (thread !== "community" && me.provider !== "phone") {
       var other = thread.split("__").filter(function (x) { return x && x !== me.uid; })[0];
       if (other) {
         await S._fs.setDoc(S._fs.doc(S.sDb, "users", other, "inbox", mid),
           { from: me.uid, fromName: dispName, authorRole: role, text: t.slice(0, 200), at: now, read: false, kind: "general", thread: thread });
-        await S._fs.setDoc(S._fs.doc(S.sDb, "users", me.uid, "inbox", mid),
-          { from: me.uid, fromName: dispName, authorRole: role, text: t.slice(0, 200), at: now, read: true, kind: "sent", thread: thread, to: other });
       }
     }
   }
@@ -394,6 +563,19 @@ window.SK.fb = (function () {
     } catch (e) { return []; }
   }
   function watchInbox(uid, cb) {
+    var phone = phoneLocal();
+    if (phone && phone.uid === uid) {
+      var cancelled = false;
+      var timer = null;
+      var refresh = function () {
+        if (cancelled) return;
+        inbox(uid, 30).then(function (rows) { if (!cancelled) cb(rows); })
+          .catch(function () { if (!cancelled) cb(null); });
+      };
+      refresh();
+      timer = setInterval(refresh, 15000);
+      return function () { cancelled = true; if (timer) clearInterval(timer); };
+    }
     var off = null, dead = false;
     ensure().then(function () {
       if (dead) return;
@@ -404,6 +586,204 @@ window.SK.fb = (function () {
       }, function () { cb(null); });
     }).catch(function () { cb(null); });
     return function () { dead = true; try { if (off) off(); } catch (e) {} };
+  }
+  async function inbox(uid, n) {
+    try {
+      var phone = phoneLocal();
+      if (phone && phone.uid === uid) {
+        var result = await window.SK.api.phoneProfile("inbox", { limit: n || 30 });
+        return result && Array.isArray(result.items) ? result.items : [];
+      }
+      await ensure();
+      var q = S._fs.query(S._fs.collection(S.sDb, "users", uid, "inbox"), S._fs.orderBy("at", "desc"), S._fs.limit(n || 30));
+      var snap = await S._fs.getDocs(q), out = [];
+      snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data() || {})); });
+      return out;
+    } catch (e) {
+      var phoneUser = phoneLocal();
+      if (phoneUser && phoneUser.uid === uid) throw e;
+      return [];
+    }
+  }
+  async function unreadCount(uid) {
+    try {
+      var rows = await inbox(uid, 40);
+      return rows.filter(function (m) { return m.read !== true && m.kind !== "sent" && m.from !== uid; }).length;
+    } catch (e) { return 0; }
+  }
+  async function markInboxRead(uid, id) {
+    try {
+      var phone = phoneLocal();
+      if (phone && phone.uid === uid) {
+        await window.SK.api.phoneProfile("mark-inbox-read", { id: id });
+        return true;
+      }
+      await ensure();
+      await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid, "inbox", id), { read: true, readAt: Date.now() }, { merge: true });
+      return true;
+    } catch (e) { return false; }
+  }
+  async function pushInbox(uid, msg) {
+    await ensure();
+    var now = Date.now(), mid = msg.id || ("n_" + now + "_" + Math.random().toString(36).slice(2, 8));
+    var payload = Object.assign({
+      from: "admin", fromName: "Studio team", authorRole: "admin", at: now, read: false, kind: "general"
+    }, msg);
+    delete payload.id;
+    await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid, "inbox", mid), payload);
+    return mid;
+  }
+
+  /* ---------- notices (targeted, timed, view-limited) ---------- */
+  function noticeLive(n, views) {
+    if (!n || n.active === false) return false;
+    if (n.expiresAt && Date.now() > Number(n.expiresAt)) return false;
+    if (n.maxViews && Number(views || 0) >= Number(n.maxViews)) return false;
+    return true;
+  }
+  function noticeForUser(n, uid) {
+    if (!n) return false;
+    if (n.audience === "user") return String(n.uid || n.targetUid || "") === String(uid);
+    if (Array.isArray(n.uids) && n.uids.length) return n.uids.indexOf(uid) >= 0;
+    if (n.uid && n.audience !== "all") return String(n.uid) === String(uid);
+    return n.audience === "all" || !n.audience;
+  }
+  async function noticeViews(uid) {
+    try {
+      await ensure();
+      var snap = await S._fs.getDocs(S._fs.query(S._fs.collection(S.sDb, "users", uid, "noticeViews"), S._fs.limit(120)));
+      var out = {};
+      snap.forEach(function (d) { out[d.id] = d.data() || {}; });
+      return out;
+    } catch (e) { return {}; }
+  }
+  async function notices(uid) {
+    try {
+      await ensure();
+      var snap = await S._fs.getDocs(S._fs.query(S._fs.collection(S.sDb, "notices"), S._fs.orderBy("createdAt", "desc"), S._fs.limit(60)));
+      var views = await noticeViews(uid), out = [];
+      snap.forEach(function (d) {
+        var n = Object.assign({ id: d.id }, d.data() || {});
+        var v = views[d.id] || {};
+        if (v.dismissed === true) return;
+        if (!noticeForUser(n, uid)) return;
+        if (!noticeLive(n, v.views)) return;
+        n.views = Number(v.views) || 0;
+        out.push(n);
+      });
+      return out;
+    } catch (e) { return []; }
+  }
+  async function markNoticeView(uid, id) {
+    try {
+      await ensure();
+      var ref = S._fs.doc(S.sDb, "users", uid, "noticeViews", id);
+      var snap = await S._fs.getDoc(ref);
+      var cur = snap.exists() ? (snap.data() || {}) : {};
+      await S._fs.setDoc(ref, { views: (Number(cur.views) || 0) + 1, lastAt: Date.now(), msgId: id }, { merge: true });
+      return true;
+    } catch (e) { return false; }
+  }
+  async function dismissNotice(uid, id) {
+    try {
+      await ensure();
+      await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid, "noticeViews", id), { dismissed: true, dismissedAt: Date.now() }, { merge: true });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ---------- security strikes ---------- */
+  async function recordStrike(uid, reason) {
+    if (!uid) return { strikes: 0, banned: false };
+    var localKey = "sk_strikes_" + uid;
+    try {
+      var phone = phoneLocal();
+      if (phone && phone.uid === uid) {
+        var result = await window.SK.api.phoneProfile("strike", { reason: reason });
+        try { localStorage.setItem(localKey, String(result.strikes)); } catch (e) {}
+        return { strikes: result.strikes, banned: result.banned, ignored: result.ignored === true };
+      }
+      if (await verifyAdmin(uid)) return { strikes: 0, banned: false, ignored: true };
+      await ensure();
+      var ref = S._fs.doc(S.sDb, "users", uid), snap = await S._fs.getDoc(ref);
+      var d = (snap.exists() && snap.data()) || {};
+      var n = (Number(d.strikes) || 0) + 1;
+      var now = Date.now();
+      var patch = {
+        strikes: n,
+        lastStrikeAt: now,
+        strikeReason: String(reason || "devtools").slice(0, 80),
+        banned: true,
+        banReason: "Automatic: developer tools opened",
+        bannedAt: now
+      };
+      await S._fs.setDoc(ref, patch, { merge: true });
+      try { localStorage.setItem(localKey, String(n)); } catch (e) {}
+      return { strikes: n, banned: true };
+    } catch (e) {
+      var existing = 0;
+      try { existing = parseInt(localStorage.getItem(localKey) || "0", 10) || 0; } catch (e2) {}
+      return { strikes: existing, banned: false, offline: true };
+    }
+  }
+  async function resetStrikes(uid) {
+    try {
+      await ensure();
+      await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid), { strikes: 0, lastStrikeAt: 0, strikeReason: "" }, { merge: true });
+      try { localStorage.removeItem("sk_strikes_" + uid); } catch (e) {}
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ---------- reports ---------- */
+  async function replyReport(report, text, adminName) {
+    if (!report || !report.by) throw new Error("No reporter on this report");
+    var clean = String(text || "").trim().slice(0, 500);
+    if (!clean) throw new Error("Write a reply first");
+    var now = Date.now();
+    await pushInbox(report.by, {
+      fromName: String(adminName || "Studio team").slice(0, 40),
+      kind: "report_reply",
+      text: clean,
+      link: "msgs.html",
+      reportId: report.id || "",
+      postId: report.postId || "",
+      read: false,
+      at: now
+    });
+    try {
+      await ensure();
+      if (report.id) {
+        await S._fs.setDoc(S._fs.doc(S.sDb, "post_reports", report.id), { status: "replied", reply: clean, repliedAt: now }, { merge: true });
+      }
+    } catch (e) {}
+    return true;
+  }
+
+  /* ---------- force messages ---------- */
+  function forceViewCount(f) {
+    var key = "sk_fv_" + String((f && (f.id || f.adminAt)) || "global");
+    try { return parseInt(localStorage.getItem(key) || "0", 10) || 0; } catch (e) { return 0; }
+  }
+  async function bumpForceView(uid, f) {
+    try {
+      var vk = "sk_fv_" + String((f && (f.id || f.adminAt)) || "global");
+      try { localStorage.setItem(vk, String(forceViewCount(f) + 1)); } catch (e) {}
+      await ensure();
+      var ref = S._fs.doc(S.sDb, "forceViews", uid);
+      var snap = await S._fs.getDoc(ref);
+      var cur = (snap.exists() && snap.data()) || {};
+      await S._fs.setDoc(ref, {
+        count: (Number(cur.count) || 0) + 1,
+        lastAt: Date.now(),
+        name: String((f && f.fromName) || "admin").slice(0, 40),
+        text: String((f && f.text) || "").slice(0, 180)
+      }, { merge: true });
+      return true;
+    } catch (e) { return false; }
+  }
+  function ackForce(uid, f) {
+    return Promise.resolve({ released: !forceActive(f) });
   }
   /* Force msg: admin writes forceMsgs/{uid}; every page redirects the user to
      forcemsg.html while adminAt is fresh (<2 min) and allowLeave is false. */
@@ -417,10 +797,18 @@ window.SK.fb = (function () {
     }).catch(function () { cb(null); });
     return function () { dead = true; try { if (off) off(); } catch (e) {} };
   }
+  /* A forced notice stays until the admin removes it, its timer expires, or
+     the learner has seen it maxViews times — whichever comes first. */
   function forceActive(f) {
-    if (!f) return false;
-    if (f.allowLeave === true) return false;
-    return Date.now() - (f.adminAt || 0) < 120000;
+    if (!f || f.active === false || f.allowLeave === true || f.released === true) return false;
+    var now = Date.now();
+    var started = Number(f.adminAt || f.createdAt || 0);
+    if (started && now - started > 30 * 86400000) return false;
+    var expires = Number(f.expiresAt) || 0;
+    if (expires > 0 && now > expires) return false;
+    var max = Number(f.maxViews) || 0;
+    if (max > 0 && forceViewCount(f) >= max) return false;
+    return true;
   }
   function searchUsers(term, n) {
     try {
@@ -464,6 +852,53 @@ window.SK.fb = (function () {
 
   /* Raw access for heavy pages (admin/posts) — uses the same initialized db. */
   function raw() { return { get S() { return S; } }; }
+
+  /* ---------- admin helpers ---------- */
+  async function createNotice(data) {
+    await ensure();
+    var now = Date.now();
+    var n = {
+      title: String((data && data.title) || "Notice").slice(0, 120),
+      body: String((data && data.body) || "").slice(0, 1200),
+      link: String((data && data.link) || "").slice(0, 300),
+      audience: (data && data.audience === "user") ? "user" : "all",
+      uid: (data && data.audience === "user") ? String(data.uid || "") : "",
+      createdAt: now,
+      active: true,
+      maxViews: Math.max(0, Math.min(999, Number(data && data.maxViews) || 0)),
+      expiresAt: Number(data && data.expiresAt) || 0
+    };
+    var id = "nt_" + now + "_" + Math.random().toString(36).slice(2, 7);
+    await S._fs.setDoc(S._fs.doc(S.sDb, "notices", id), n);
+    return Object.assign({ id: id }, n);
+  }
+  async function noticesAll(n) {
+    try {
+      await ensure();
+      var snap = await S._fs.getDocs(S._fs.query(S._fs.collection(S.sDb, "notices"), S._fs.orderBy("createdAt", "desc"), S._fs.limit(n || 20)));
+      var out = [];
+      snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data() || {})); });
+      return out;
+    } catch (e) { return []; }
+  }
+  async function setNoticeActive(id, active) {
+    await ensure();
+    await S._fs.setDoc(S._fs.doc(S.sDb, "notices", id), { active: !!active, updatedAt: Date.now() }, { merge: true });
+  }
+  async function deleteNotice(id) {
+    await ensure();
+    await S._fs.deleteDoc(S._fs.doc(S.sDb, "notices", id));
+  }
+  async function forceViews(n) {
+    try {
+      await ensure();
+      var snap = await S._fs.getDocs(S._fs.query(S._fs.collection(S.sDb, "forceViews"), S._fs.orderBy("lastAt", "desc"), S._fs.limit(n || 10)));
+      var out = [];
+      snap.forEach(function (d) { out.push(Object.assign({ uid: d.id }, d.data() || {})); });
+      return out;
+    } catch (e) { return []; }
+  }
+
   async function studyLog(mins) {
     try {
       var me = await currentUser(); if (!me) return;
@@ -535,5 +970,24 @@ window.SK.fb = (function () {
     return ids;
   }
 
-  return { ensure: ensure, currentUser: currentUser, userDoc: userDoc, requireLogin: requireLogin, signOut: signOut, banCheck: banCheck, phoneSession: phoneSession, idToken: idToken, authHeaders: authHeaders, syncPhone: syncPhone, syncGoogle: syncGoogle, saveProfile: saveProfile, checkPhone: checkPhone, mintKey: mintKey, progress: progress, saveProgress: saveProgress, gamification: gamification, activity: activity, dayKey: dayKey, captureReferral: captureReferral, consumeReferral: consumeReferral, claimRewards: claimRewards, myReferrals: myReferrals, focusJoin: focusJoin, focusRoster: focusRoster, focusRooms: focusRooms, sendRoomChat: sendRoomChat, watchRoomChat: watchRoomChat, studyLog: studyLog, saveNote: saveNote, listNotes: listNotes, sendChat: sendChat, listChat: listChat, announcements: announcements, postsRecent: postsRecent, enrolled: enrolled, toggleEnroll: toggleEnroll, presenceBeat: presenceBeat, isAdmin: isAdmin, threadId: threadId, sendMsg: sendMsg, watchThread: watchThread, myThreads: myThreads, watchInbox: watchInbox, watchForce: watchForce, forceActive: forceActive, searchUsers: searchUsers, appLatest: appLatest, appVersions: appVersions, raw: raw };
+  return {
+    ensure: ensure, currentUser: currentUser, userDoc: userDoc, requireLogin: requireLogin, signOut: signOut,
+    banCheck: banCheck, phoneSession: phoneSession, idToken: idToken, authHeaders: authHeaders,
+    syncPhone: syncPhone, syncGoogle: syncGoogle, saveProfile: saveProfile, checkPhone: checkPhone, mintKey: mintKey,
+    prefs: prefs, saveOnboarding: saveOnboarding, myBatches: myBatches, mainBatch: mainBatch, setMainBatch: setMainBatch,
+    progress: progress, saveProgress: saveProgress, gamification: gamification,
+    activity: activity, activityMap: activityMap, syncActivity: syncActivity, dayKey: dayKey,
+    captureReferral: captureReferral, consumeReferral: consumeReferral, claimRewards: claimRewards, myReferrals: myReferrals,
+    focusJoin: focusJoin, focusRoster: focusRoster, focusRooms: focusRooms, sendRoomChat: sendRoomChat, watchRoomChat: watchRoomChat,
+    studyLog: studyLog, saveNote: saveNote, listNotes: listNotes, sendChat: sendChat, listChat: listChat,
+    announcements: announcements, postsRecent: postsRecent, enrolled: enrolled, toggleEnroll: toggleEnroll,
+    presenceBeat: presenceBeat, isAdmin: isAdmin, verifyAdmin: verifyAdmin,
+    threadId: threadId, sendMsg: sendMsg, watchThread: watchThread, myThreads: myThreads,
+    watchInbox: watchInbox, inbox: inbox, unreadCount: unreadCount, markInboxRead: markInboxRead, pushInbox: pushInbox,
+    notices: notices, noticeLive: noticeLive, noticeForUser: noticeForUser, markNoticeView: markNoticeView, dismissNotice: dismissNotice,
+    recordStrike: recordStrike, resetStrikes: resetStrikes, replyReport: replyReport,
+    bumpForceView: bumpForceView, forceViewCount: forceViewCount, ackForce: ackForce, watchForce: watchForce, forceActive: forceActive, forceViews: forceViews,
+    createNotice: createNotice, noticesAll: noticesAll, setNoticeActive: setNoticeActive, deleteNotice: deleteNotice,
+    searchUsers: searchUsers, appLatest: appLatest, appVersions: appVersions, raw: raw
+  };
 })();

@@ -1,8 +1,8 @@
 /* GET /api/media/live?course_id=&type=1&key=&device_id=
    type: 1 = live, 0 = upcoming, 2 = completed.
-   Needs a well-formed app key+device (minted client-side via smexgod anon auth). */
-const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, mirrorNig, asId } = require("../../lib/http");
-const { validAppKey } = require("../../lib/verify");
+   Requires a verified session (or Google ID token) plus a well-formed app key. */
+const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, mirrorNig, asId, rateLimit } = require("../../lib/http");
+const { validAppKey, authorize } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
@@ -16,6 +16,9 @@ module.exports = async function handler(req, res) {
     if (!courseId || !type || !validAppKey(key, deviceId)) {
       return sendJson(req, res, 400, { success: false, error: "Missing live-class parameters" });
     }
+    if (!rateLimit(req, res, "live", 40, 60_000)) return;
+    await authorize(req, { courseId });
+
     const routes = mediaRoutes();
     const mirror = mirrorNig();
     const params = new URLSearchParams({ action: "classes", type, course_id: courseId, key, device_id: deviceId }).toString();
@@ -27,6 +30,10 @@ module.exports = async function handler(req, res) {
     }
     return sendJson(req, res, upstream.status, upstream.json);
   } catch (err) {
-    return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Classes fetch failed" });
+    const status = err.status || 500;
+    return sendJson(req, res, status, {
+      success: false,
+      error: status < 500 ? (err.message || "Live classes denied") : "Live classes temporarily unavailable",
+    });
   }
 };

@@ -1,5 +1,5 @@
 // backend/api/courses/content.js
-const { sendJson, requireMethod, mediaRoutes, mirrorNig, fetchUpstream } = require('../../lib/http');
+const { sendJson, sendOptions, requireMethod, mediaRoutes, mirrorNig, fetchUpstream, rateLimit } = require('../../lib/http');
 
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -19,13 +19,15 @@ function hostOf(url) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method === "OPTIONS") return sendJson(req, res, 204, {});
+  if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["GET"])) return;
+  if (!rateLimit(req, res, "content", 120, 60_000)) return;
 
   try {
     const { content, folder = "0" } = req.query;
+    const folderId = /^\d+$/.test(String(folder)) && String(folder).length <= 12 ? String(folder) : "0";
 
-    if (!content || !/^\d+$/.test(content)) {
+    if (!content || !/^\d+$/.test(String(content)) || String(content).length > 12) {
       return sendJson(req, res, 400, { success: false, error: "Invalid or missing content ID" });
     }
 
@@ -38,16 +40,16 @@ module.exports = async function handler(req, res) {
     const candidates = [];
 
     /* 1. Mirror root path (confirmed working from tests) */
-    candidates.push(`${mirrorBase}/?content=${content}&folder=${folder}&_t=${timestamp}`);
+    candidates.push(`${mirrorBase}/?content=${content}&folder=${folderId}&_t=${timestamp}`);
 
     /* 2. Mirror /api/nt (vendor's real content path) */
-    candidates.push(`${mirrorBase}/api/nt?content=${content}&folder=${folder}&_t=${timestamp}`);
+    candidates.push(`${mirrorBase}/api/nt?content=${content}&folder=${folderId}&_t=${timestamp}`);
 
     /* 3. Primary /api/nt (vendor's real content path — was missing before) */
-    candidates.push(`${primaryHost}/api/nt?content=${content}&folder=${folder}&_t=${timestamp}`);
+    candidates.push(`${primaryHost}/api/nt?content=${content}&folder=${folderId}&_t=${timestamp}`);
 
     /* 4. Primary configured route (/api/nig or whatever MEDIA_ROUTES_JSON says) */
-    candidates.push(`${routes.nig}?content=${content}&folder=${folder}&_t=${timestamp}`);
+    candidates.push(`${routes.nig}?content=${content}&folder=${folderId}&_t=${timestamp}`);
 
     let result = null;
     for (const url of candidates) {
@@ -73,6 +75,6 @@ module.exports = async function handler(req, res) {
 
   } catch (err) {
     console.error(`[CONTENT] ❌ CRITICAL ERROR:`, err.message, err.stack);
-    return sendJson(req, res, 500, { success: false, error: "Internal server error", details: err.message });
+    return sendJson(req, res, 500, { success: false, error: "Internal server error" });
   }
 };

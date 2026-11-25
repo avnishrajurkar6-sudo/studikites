@@ -1,5 +1,5 @@
-const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId } = require("../../lib/http");
-const { mintSession } = require("../../lib/verify");
+const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId, rateLimit } = require("../../lib/http");
+const { mintSession, assertNotBanned } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
@@ -12,6 +12,8 @@ module.exports = async function handler(req, res) {
     if (!mobile) return sendJson(req, res, 400, { success: false, error: "Enter a valid 10-digit Indian mobile number" });
     if (!/^\d{4,8}$/.test(otp)) return sendJson(req, res, 400, { success: false, error: "Enter the OTP you received" });
     if (!deviceId) return sendJson(req, res, 400, { success: false, error: "Missing device id" });
+    if (!rateLimit(req, res, "otp-verify-ip", 15, 60_000)) return;
+    if (!rateLimit(req, res, "otp-verify-mobile:" + mobile, 8, 10 * 60_000)) return;
     const base = otpBase();
     const upstream = await fetchUpstream(`${base}/api/verify-otp`, {
       method: "POST",
@@ -21,6 +23,7 @@ module.exports = async function handler(req, res) {
     if (!upstream.json || upstream.json.success !== true || !(upstream.json.data && upstream.json.data.accessToken)) {
       return sendJson(req, res, 400, upstream.json || { success: false, error: "Invalid OTP" });
     }
+    await assertNotBanned("phone_" + mobile);
     // Backend-signed session: proves this device passed OTP, no Firebase needed.
     upstream.json.session = mintSession("phone_" + mobile, "phone");
     return sendJson(req, res, 200, upstream.json);

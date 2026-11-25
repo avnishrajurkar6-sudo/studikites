@@ -10,8 +10,8 @@
    so the client may pass `title` to fill the gap, and we infer file_type from
    the URL when the vendor omits it.
 */
-const { sendJson, sendOptions, requireMethod, mirrorNig, mediaRoutes, fetchUpstream, asId } = require("../../lib/http");
-const { validAppKey } = require("../../lib/verify");
+const { sendJson, sendOptions, requireMethod, mirrorNig, mediaRoutes, fetchUpstream, asId, rateLimit } = require("../../lib/http");
+const { validAppKey, authorize } = require("../../lib/verify");
 
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -80,14 +80,14 @@ function extractMedia(json, fallbackTitle) {
     : (json.data && json.data.link) ? json.data.link
     : null;
   if (inner && inner.file_url) {
-    return normalizeFileUrl(inner.file_url, inner.token || "", null, fallbackTitle, Number(inner.is_drm) === 1);
+    return normalizeFileUrl(inner.file_url, inner.token || "", null, fallbackTitle, Number(inner.is_drm) === 1, inner.vdc_id);
   }
 
   const data = json.decryptedData || json.data || json;
   if (!data || typeof data !== 'object') return null;
 
   if (data.file_url) {
-    return normalizeFileUrl(data.file_url, data.token || "", data.file_type, data.title || fallbackTitle, Number(data.is_drm) === 1);
+    return normalizeFileUrl(data.file_url, data.token || "", data.file_type, data.title || fallbackTitle, Number(data.is_drm) === 1, data.vdc_id);
   }
 
   const found = findUrl(data);
@@ -97,7 +97,7 @@ function extractMedia(json, fallbackTitle) {
 }
 
 /* Only accept real media. Vendor WAF blocks surface as HTML/Cloudflare pages. */
-function normalizeFileUrl(url, token, file_type, title, is_drm) {
+function normalizeFileUrl(url, token, file_type, title, is_drm, vdcId) {
   if (!url || typeof url !== 'string') return null;
   const u = String(url).trim();
   if (!/^https?:\/\//i.test(u)) return null;
@@ -110,7 +110,7 @@ function normalizeFileUrl(url, token, file_type, title, is_drm) {
     file_type: type,
     title: String(title || "").trim() || titleFromUrl(u),
     is_drm: !!is_drm,
-    vdc_id: ""
+    vdc_id: String(vdcId || "")
   };
 }
 
@@ -130,6 +130,11 @@ module.exports = async function handler(req, res) {
       return sendJson(req, res, 400, { success: false, error: "Missing playback parameters" });
     }
 
+    /* Playback is verified server-side. Google ID token, signed phone session,
+       or the course's real free-preview file — never a client-supplied flag. */
+    if (!rateLimit(req, res, "play", 30, 60_000)) return;
+    const auth = await authorize(req, { courseId, contentId });
+
     const routes = mediaRoutes();
     const mirrorBase = mirrorNig().replace(/\/$/, '');
     const timestamp = Date.now();
@@ -139,6 +144,7 @@ module.exports = async function handler(req, res) {
     const candidates = [];
 
     if (courseId && contentId) {
+      candidates.push(`https://nt.studybeepro.site/mj.php?content_id=${contentId}&course_id=${courseId}&_t=${timestamp}`);
       candidates.push(`https://nt.studybeepro.site/vc/media?course_id=${courseId}&content_id=${contentId}&_t=${timestamp}`);
       candidates.push(`${mirrorBase}/vc/media?course_id=${courseId}&content_id=${contentId}&_t=${timestamp}`);
     }
@@ -158,7 +164,13 @@ module.exports = async function handler(req, res) {
       const extracted = extractMedia(result.json, hintTitle);
       if (extracted) {
         console.log(`[PLAY] OK via ${url} type=${extracted.file_type} title="${extracted.title}"`);
-        return sendJson(req, res, 200, { success: true, ...extracted, vdc_id: vdcId });
+        return sendJson(req, res, 200, {
+          success: true,
+          ...extracted,
+          vdc_id: vdcId || extracted.vdc_id || "",
+          via: auth && auth.preview ? "preview" : "verified",
+          issuedAt: Date.now(),
+        });
       }
     }
 
@@ -171,6 +183,10 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (err) {
-    return sendJson(req, res, err.status || 500, { success: false, error: err.message || "Play API rejected request" });
+    const status = err.status || 500;
+    return sendJson(req, res, status, {
+      success: false,
+      error: status < 500 ? (err.message || "Playback denied") : "Playback temporarily unavailable. Please retry.",
+    });
   }
 };

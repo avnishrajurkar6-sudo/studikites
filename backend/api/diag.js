@@ -1,54 +1,46 @@
 /* GET /api/diag — deployment health WITHOUT secrets.
    Reports only booleans, hosts and latencies. Paste this output when reporting bugs. */
-const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, otpBase, mirrorNig } = require("../lib/http");
+const { sendJson, sendOptions, requireMethod, mediaRoutes, fetchUpstream, otpBase, mirrorNig, rateLimit } = require("../lib/http");
+const { requireAdmin } = require("../lib/verify");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["GET"])) return;
+  if (!rateLimit(req, res, "diag", 12, 60_000)) return;
+  try {
+    await requireAdmin(req);
+  } catch (error) {
+    const status = error.status || 503;
+    return sendJson(req, res, status, {
+      success: false,
+      error: status < 500 ? error.message : "Admin diagnostics unavailable",
+    });
+  }
+
   const out = {
     ok: true,
     time: new Date().toISOString(),
     env: {
       sessionSecret: !!process.env.SESSION_SECRET,
-      studikiKey: !!process.env.FIREBASE_STUDIKI_API_KEY,
+      studikiKey: !!(process.env.FIREBASE_STUDIKI_API_KEY || process.env.STUDIKI_API_KEY),
       smexgodKey: !!process.env.FIREBASE_SMEXGOD_API_KEY,
-      adsense: !!(process.env.ADSENSE_CLIENT || "ca-pub-7694333485336687"),
       rtdb: !!process.env.FIREBASE_STUDIKI_DATABASE_URL,
       adminEmails: !!process.env.ADMIN_EMAILS,
       xkiro: !!process.env.XKIRO_API_KEY,
     },
-    keyCheck: {},
     checks: {},
   };
-  /* Where each key actually comes from + first/last 4 chars, so a typo'd env
-     value is visible at a glance. Codes are public browser keys, not secrets. */
-  function keyInfo(name, fallbackPrefix) {
-    const env = process.env[name] || "";
-    return env
-      ? { source: "env", len: env.length, head: env.slice(0, 6), tail: env.slice(-4), matchesDefault: env.startsWith(fallbackPrefix) }
-      : { source: "code-default", matchesDefault: true };
-  }
-  out.keyCheck.studiki = keyInfo("FIREBASE_STUDIKI_API_KEY", "AIzaSy");
-  out.keyCheck.smexgod = keyInfo("FIREBASE_SMEXGOD_API_KEY", "AIzaSy");
   async function check(name, fn) {
     const t0 = Date.now();
     try {
       out.checks[name] = Object.assign({ ok: true, ms: Date.now() - t0 }, await fn());
     } catch (e) {
-      out.checks[name] = { ok: false, ms: Date.now() - t0, error: (e && e.message) || "failed" };
+      out.checks[name] = { ok: false, ms: Date.now() - t0, error: "check failed" };
     }
   }
   let routes = null;
   try { routes = mediaRoutes(); } catch (e) { routes = null; }
   await Promise.all([
-    check("studikiKeyLive", async () => {
-      const key = process.env.FIREBASE_STUDIKI_API_KEY || "AIzaSyCG2zFEsE5Fr8Vx-5of_PL0xQeP773MNFM";
-      const r = await fetchUpstream(
-        `https://firestore.googleapis.com/v1/projects/studiki/databases/(default)/documents/users?pageSize=1&key=${encodeURIComponent(key)}`,
-        { timeout: 4000 }
-      );
-      return { status: r.status, keyWorks: r.status === 200 };
-    }),
     check("otp", async () => {
       const r = await fetchUpstream(`${otpBase()}/api/check-user`, {
         method: "POST", headers: { "Content-Type": "application/json" },

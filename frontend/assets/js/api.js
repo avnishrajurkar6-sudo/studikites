@@ -1,5 +1,6 @@
-/* StudiKitEZ API layer — frontend calls ONLY stable backend routes (/api/*).
-   Vendor URLs live in backend env (MEDIA_ROUTES_JSON), so frontend never breaks. */
+/* StudiKitEZ API layer — the browser only calls stable /api/* routes.
+   Vendor URLs and admin allowlists live in backend env, never here.
+   AVkings engine · v2 */
 window.SK = window.SK || {};
 window.SK.api = (function () {
   function base() { return (window.__SK__ && window.__SK__.backendBaseUrl) || ""; }
@@ -18,24 +19,34 @@ window.SK.api = (function () {
         method: method,
         headers: Object.assign(
           { Accept: "application/json" },
-          opts.body ? { "Content-Type": "application/json" } : {},
+          opts.body !== undefined ? { "Content-Type": "application/json" } : {},
           opts.headers || {}
         ),
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
         signal: c.signal,
+        credentials: "omit",
+        cache: "no-store"
       });
       var text = await res.text();
       var json = null;
       try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
       if (!res.ok || !json) {
-        let msg = (json && (json.error || json.message || json.reason)) || ("HTTP " + res.status);
+        var msg = (json && (json.error || json.message || json.reason)) || ("HTTP " + res.status);
         if (msg && typeof msg === "object") msg = msg.message || ("HTTP " + res.status);
-        throw new Error(msg);
+        var err = new Error(String(msg));
+        err.status = res.status;
+        err.code = (json && json.code) || "";
+        err.detail = (json && json.detail) || "";
+        err.retryable = res.status === 429 || res.status >= 502;
+        throw err;
       }
       return json;
     } catch (e) {
-      if (e && e.name === "AbortError") throw new Error("Request timed out");
-      throw e;
+      if (e && e.name === "AbortError") {
+        var te = new Error("Request timed out"); te.status = 504; te.retryable = true; throw te;
+      }
+      if (e && e.status) throw e;
+      var ne = new Error("Network unavailable"); ne.status = 0; ne.retryable = true; throw ne;
     } finally { clearTimeout(timer); }
   }
 
@@ -46,78 +57,141 @@ window.SK.api = (function () {
     return configCache;
   }
 
-  async function catalog() {
-    var url = (window.__SK__ && window.__SK__.batchesUrl) || "batches.json";
-    var res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Catalog failed to load");
-    return res.json();
+  /* Backend-first catalog with a durable local snapshot so the site always
+     renders, even when the vendor feed is down. */
+  var catalogCache = null;
+  async function catalog(force) {
+    if (catalogCache && !force) return catalogCache;
+    try {
+      var j = await req("GET", "/api/courses/batches", { params: force ? { refresh: "1", _t: String(Date.now()) } : {} });
+      var data = (j && Array.isArray(j.new)) ? j : null;
+      if (!data || !data.new.length) throw new Error("empty catalog");
+      catalogCache = data;
+      try { localStorage.setItem("sk_catalog", JSON.stringify(data)); } catch (e) {}
+      return data;
+    } catch (e) {
+      try {
+        var cached = JSON.parse(localStorage.getItem("sk_catalog") || "null");
+        if (cached && Array.isArray(cached.new) && cached.new.length) { catalogCache = cached; return cached; }
+      } catch (e2) {}
+      var res = await fetch((window.__SK__ && window.__SK__.batchesUrl) || "batches.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("Catalog unavailable");
+      catalogCache = await res.json();
+      return catalogCache;
+    }
   }
-  async function allBatches() {
-    var c = await catalog();
-    return [].concat(c.new || [], c.old || []);
+  async function allBatches(force) {
+    var c = await catalog(force);
+    var seen = {}, out = [];
+    [].concat(c.new || [], c.old || []).forEach(function (b) {
+      var id = String(b && b.id || "");
+      if (!id || seen[id]) return;
+      seen[id] = 1;
+      out.push({ id: id, title: String(b.title || ""), thumbnail: String(b.thumbnail || "") });
+    });
+    return out;
   }
 
   function content(courseId, folderId) {
     var attempts = 0, maxAttempts = 3;
     function attempt() {
-      var ts = Date.now();
-      return req("GET", "/api/courses/content", { params: { content: String(courseId), folder: String(folderId || "0"), _t: String(ts) } })
-        .then(function (j) {
-          var data = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : null);
-          if (!data) throw new Error("Content API returned an unexpected shape");
-          return data;
-        }).catch(function (e) {
-          attempts++;
-          var msg = String(e.message || "");
-          if ((msg.includes("429") || msg.includes("502") || msg.includes("504")) && attempts < maxAttempts) {
-            var delay = attempts * 1500;
-            return new Promise(function (resolve) { setTimeout(resolve, delay); }).then(attempt);
-          }
-          throw e;
-        });
+      return req("GET", "/api/courses/content", {
+        params: { content: String(courseId), folder: String(folderId || "0"), _t: String(Date.now()) }
+      }).then(function (j) {
+        var data = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : null);
+        if (!data) throw new Error("Content API returned an unexpected shape");
+        return data;
+      }).catch(function (e) {
+        attempts++;
+        if (e.retryable && attempts < maxAttempts) {
+          return new Promise(function (r) { setTimeout(r, attempts * 1200); }).then(attempt);
+        }
+        throw e;
+      });
     }
     return attempt();
   }
-  function play(courseId, contentId, key, deviceId, headers, vdcId, title) {
+
+  function play(courseId, contentId, key, deviceId, headers, vdcId, title, forceRefresh) {
     var attempts = 0, maxAttempts = 3;
-    function attempt() {
-      return req("GET", "/api/media/play", { params: { course_id: String(courseId), content_id: String(contentId), key: key, device_id: deviceId, vdc_id: vdcId || "", title: title || "" }, headers: headers })
+    function attempt(refresh) {
+      var params = {
+        course_id: String(courseId || ""),
+        content_id: String(contentId || ""),
+        key: key,
+        device_id: deviceId,
+        vdc_id: vdcId || "",
+        title: title || ""
+      };
+      if (refresh || forceRefresh) params.refresh = "1";
+      params._t = String(Date.now());
+      return req("GET", "/api/media/play", { params: params, headers: headers })
         .then(function (j) {
           var data = j.decryptedData || j;
-          if (!data || !data.file_url) throw new Error(j.error || j.reason || "No video URL returned");
+          if (!data || !data.file_url) throw new Error((j && j.error) || "No media link returned");
           return data;
         }).catch(function (e) {
           attempts++;
-          var msg = String(e.message || "");
-          /* Vendor rate-limits (429) and WAF blips (502/504) are transient. */
-          if ((msg.indexOf("429") >= 0 || msg.indexOf("502") >= 0 || msg.indexOf("504") >= 0 || msg.indexOf("timed out") >= 0) && attempts < maxAttempts) {
-            return new Promise(function (resolve) { setTimeout(resolve, attempts * 1200); }).then(attempt);
+          if (e.retryable && attempts < maxAttempts) {
+            return new Promise(function (r) { setTimeout(r, attempts * 1200); }).then(function () { return attempt(true); });
           }
           throw e;
         });
     }
-    return attempt();
+    return attempt(false);
   }
+
   function live(courseId, type, key, deviceId, headers) {
-    return req("GET", "/api/media/live", { params: { course_id: String(courseId), type: String(type || "1"), key: key, device_id: deviceId }, headers: headers })
-      .then(function (j) { return Array.isArray(j.data) ? j.data : []; });
+    return req("GET", "/api/media/live", {
+      params: { course_id: String(courseId), type: String(type || "1"), key: key, device_id: deviceId },
+      headers: headers
+    }).then(function (j) { return Array.isArray(j.data) ? j.data : []; });
   }
+
   function sendOtp(mobile, deviceId) { return req("POST", "/api/auth/send-otp", { body: { mobile: mobile, deviceId: deviceId } }); }
   function verifyOtp(mobile, otp, deviceId) { return req("POST", "/api/auth/verify-otp", { body: { mobile: mobile, otp: otp, deviceId: deviceId } }); }
-  function aiChat(prompt, mode, history, headers, context) {
-    return req("POST", "/api/ai/chat", { body: { prompt: prompt, mode: mode, history: history || [], context: context || {} }, headers: headers, timeout: 30000 })
-      .then(function (j) {
-        if (!j.reply) throw new Error(j.error || "AI gave no answer");
-        return j.reply;
-      });
+  function isAdmin(headers) { return req("POST", "/api/auth/is-admin", { headers: headers, body: {}, timeout: 10000 }); }
+  async function createTelegramLink() {
+    var headers = await window.SK.fb.authHeaders();
+    return req("POST", "/api/auth/telegram-link", {
+      headers: headers,
+      body: { action: "create" },
+      timeout: 12000
+    });
   }
+  function phoneProfile(action, data) {
+    var session = window.SK.fb && window.SK.fb.phoneSession();
+    if (!session) return Promise.reject(new Error("Phone sign-in required"));
+    var headers = { "x-sk-session": session };
+    if (action === "get" || action === "inbox") {
+      return req("GET", "/api/auth/profile", {
+        params: action === "inbox" ? { action: "inbox", limit: String((data && data.limit) || 30) } : {},
+        headers: headers
+      });
+    }
+    return req("POST", "/api/auth/profile", {
+      headers: headers,
+      body: Object.assign({}, data || {}, { action: action })
+    });
+  }
+  function aiChat(prompt, mode, history, headers, context) {
+    return req("POST", "/api/ai/chat", {
+      body: { prompt: prompt, mode: mode, history: history || [], context: context || {} },
+      headers: headers, timeout: 30000
+    }).then(function (j) {
+      if (!j.reply) throw new Error(j.error || "AI gave no answer");
+      return j.reply;
+    });
+  }
+  function brand() { return req("GET", "/api/avkings"); }
 
   /* Free preview: first file at root, else first file one folder down. */
   async function freePreviewId(courseId) {
     var ck = "sk_free_" + courseId, cached = null;
     try { cached = sessionStorage.getItem(ck); } catch (e) {}
     if (cached) return cached;
-    var root = await content(courseId, "0"), f = root.find(function (x) { return x.type === "file"; }) || null;
+    var root = await content(courseId, "0");
+    var f = root.find(function (x) { return x.type === "file"; }) || null;
     if (!f) {
       var folder = root.find(function (x) { return x.type === "folder"; });
       if (folder) {
@@ -166,5 +240,12 @@ window.SK.api = (function () {
     } catch (e) { return []; }
   }
 
-  return { getConfig: getConfig, catalog: catalog, allBatches: allBatches, content: content, play: play, live: live, sendOtp: sendOtp, verifyOtp: verifyOtp, aiChat: aiChat, freePreviewId: freePreviewId, isFreePreview: isFreePreview, deviceId: deviceId, validMobile: validMobile, fmtDur: fmtDur, parseLinks: parseLinks };
+  return {
+    request: req, getConfig: getConfig, catalog: catalog, allBatches: allBatches,
+    content: content, play: play, live: live,
+    sendOtp: sendOtp, verifyOtp: verifyOtp, isAdmin: isAdmin, createTelegramLink: createTelegramLink,
+    phoneProfile: phoneProfile, aiChat: aiChat, brand: brand,
+    freePreviewId: freePreviewId, isFreePreview: isFreePreview,
+    deviceId: deviceId, validMobile: validMobile, fmtDur: fmtDur, parseLinks: parseLinks
+  };
 })();

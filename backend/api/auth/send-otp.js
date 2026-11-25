@@ -1,4 +1,4 @@
-const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId, rateLimit, sanitizeText } = require("../../lib/http");
 
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
@@ -7,7 +7,9 @@ module.exports = async function handler(req, res) {
     const body = await readJsonBody(req);
     const mobile = validIndianMobile(body.mobile);
     if (!mobile) return sendJson(req, res, 400, { success: false, error: "Enter a valid 10-digit Indian mobile number" });
-    const deviceId = asId(body.deviceId || body.device_id, 128) || `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (!rateLimit(req, res, "otp-send-ip", 12, 60_000)) return;
+    if (!rateLimit(req, res, "otp-send-mobile:" + mobile, 5, 10 * 60_000)) return;
+    const deviceId = sanitizeText(asId(body.deviceId || body.device_id, 128) || `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`, 128);
     const base = otpBase();
     const upstream = await fetchUpstream(`${base}/api/check-user`, {
       method: "POST",

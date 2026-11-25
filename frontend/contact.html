@@ -37,7 +37,7 @@
   <div class="page-head anim-rise">
     <span class="kicker">We read everything</span>
     <h1>Contact us</h1>
-    <p>Bug reports, payment issues, batch requests — send it here. Replies come to your email.</p>
+    <p>Bug reports, payment issues, batch requests — send it here. Signed-in users can continue the conversation in Messages.</p>
   </div>
 
   <section class="panel anim-rise" style="--d:.05s" aria-label="Contact form">
@@ -50,7 +50,7 @@
       <input class="input" id="c-subject" placeholder="Subject" maxlength="120" style="margin-top:.6rem;font-size:.9rem" />
       <textarea class="input" id="c-msg" rows="5" placeholder="What happened / what do you need?" maxlength="2000" style="margin-top:.6rem;font-size:.9rem;resize:vertical"></textarea>
       <button class="btn btn-primary" id="c-send" style="margin-top:.8rem">Send message →</button>
-      <p class="mono muted" style="font-size:.65rem;margin:.7rem 0 0">Goes straight to the admin inbox. Typical reply: within 24h.</p>
+      <p class="mono muted" style="font-size:.65rem;margin:.7rem 0 0">Goes straight to the admin inbox. Include an email address if you are not signed in.</p>
     </div>
     <div id="done" style="display:none;text-align:center;padding:1.5rem 0">
       <div class="ava" style="width:3rem;height:3rem;font-size:1.3rem;margin:0 auto .7rem">✓</div>
@@ -94,10 +94,18 @@
       return ui.toast("Invalid contact", "Enter a valid email or 10-digit mobile");
     }
     var btn = this; btn.disabled = true; btn.textContent = "Sending…";
-    fb.ensure().then(function () {
+    fb.currentUser().then(function (user) {
+      return fb.ensure().then(function () { return user; });
+    }).then(function (user) {
       var r = fb.raw();
       return r.S._fs.addDoc(r.S._fs.collection(r.S.sDb, "contact_messages"), {
-        name: name, email: email, subject: subject || "(no subject)", message: msg, at: Date.now(), status: "open"
+        name: name,
+        email: email,
+        uid: user ? String(user.uid) : "",
+        subject: subject || "(no subject)",
+        message: msg,
+        at: Date.now(),
+        status: "open"
       });
     }).then(function () {
       document.getElementById("form").style.display = "none";

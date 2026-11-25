@@ -1,7 +1,7 @@
 /* POST /api/ai/chat — AI study helper (doubt solve / explain / quiz).
    Strictly gated: verified request source (site key) + signed-in user.
    The xKiro key lives ONLY in env XKIRO_API_KEY — never in code, never shipped. */
-const { sendJson, sendOptions, requireMethod, readJsonBody, fetchUpstream } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, readJsonBody, fetchUpstream, rateLimit } = require("../../lib/http");
 const { authorize } = require("../../lib/verify");
 
 const MODES = {
@@ -15,6 +15,7 @@ const MODES = {
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["POST"])) return;
+  if (!rateLimit(req, res, "ai-chat", 20, 60_000)) return;
   try {
     const who = await authorize(req, {});
     const key = String(process.env.XKIRO_API_KEY || "").trim();
@@ -50,8 +51,7 @@ module.exports = async function handler(req, res) {
         ? String(r.json.choices[0].message.content || "").trim()
         : "";
     if (!r.ok || !reply) {
-      const why = (r.json && (r.json.error || r.json.message)) || ("AI upstream HTTP " + r.status);
-      return sendJson(req, res, 502, { success: false, error: typeof why === "string" ? why.slice(0, 200) : "AI upstream failed" });
+      return sendJson(req, res, 502, { success: false, error: "AI service is temporarily unavailable" });
     }
     return sendJson(req, res, 200, { success: true, reply: reply.slice(0, 6000), mode, uid: who.uid });
   } catch (err) {

@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Admin — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -95,18 +97,37 @@
       <div id="msg-results" style="display:flex;flex-direction:column;gap:.35rem;max-height:9rem;overflow-y:auto"></div>
       <div id="msg-target" class="mono muted" style="font-size:.7rem;margin-top:.5rem">no one selected</div>
       <textarea class="input" id="msg-text" rows="2" placeholder="Your message…" style="margin-top:.5rem;font-size:.85rem"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-top:.5rem">
+        <input class="input" id="force-title" placeholder="Title (optional)" style="font-size:.8rem" />
+        <input class="input" id="force-hours" type="number" min="0" max="720" value="0" placeholder="Hours" title="Auto-release after N hours (0 = never)" style="font-size:.8rem" />
+        <input class="input" id="force-views" type="number" min="0" max="999" value="0" placeholder="Max views" title="Auto-release after N views (0 = unlimited)" style="font-size:.8rem" />
+      </div>
       <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" id="msg-general" disabled>General (notify only)</button>
         <button class="btn btn-primary btn-sm" id="msg-force" disabled>Force (lock their screen)</button>
         <button class="btn btn-danger btn-sm" id="force-end" style="display:none">End force</button>
         <button class="btn btn-ghost btn-sm" id="force-allow" style="display:none">Allow leave</button>
       </div>
-      <p class="mono muted" style="font-size:.62rem;margin:.7rem 0 0">General → lands in their Messages page as a notification. Force → redirects them to a locked page; releases when you end it, allow leave, or you go idle 2 min.</p>
+      <p class="mono muted" style="font-size:.62rem;margin:.7rem 0 0">General → lands in their Messages page as a notification. Force → locks their screen until you end it, the timer ends, or the view limit is reached.</p>
+    </section>
+
+    <section class="panel span-6 anim-rise" aria-label="Notices">
+      <div class="row-head" style="justify-content:space-between"><span class="kicker" style="margin:0">Team notices</span><button class="btn btn-ghost btn-sm" id="nt-reload">Reload</button></div>
+      <p class="sub" style="margin-top:.5rem">Notices appear in every user's notification bell. Target everyone or one user, with a timer and view limit.</p>
+      <input class="input" id="nt-title" placeholder="Notice title" style="font-size:.84rem;margin-top:.6rem" />
+      <textarea class="input" id="nt-body" rows="2" placeholder="Message" style="font-size:.84rem;margin-top:.4rem"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-top:.5rem">
+        <input class="input" id="nt-uid" placeholder="User ID (blank = all)" style="font-size:.8rem" />
+        <input class="input" id="nt-hours" type="number" min="0" max="8760" value="0" placeholder="Hours" style="font-size:.8rem" />
+        <input class="input" id="nt-views" type="number" min="0" max="999" value="0" placeholder="Max views" style="font-size:.8rem" />
+      </div>
+      <button class="btn btn-primary btn-sm" id="nt-add" style="margin-top:.6rem">Publish notice</button>
+      <div id="nt-list" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.7rem;max-height:16rem;overflow-y:auto"></div>
     </section>
 
     <section class="panel span-6 anim-rise" aria-label="Moderation">
       <div class="row-head" style="justify-content:space-between">
-        <span class="kicker" style="margin:0">🛡 Moderation <span id="mod-count" class="muted"></span></span>
+        <span class="kicker" style="margin:0"> Moderation <span id="mod-count" class="muted"></span></span>
         <button class="btn btn-ghost btn-sm" id="mod-reload">Reload</button>
       </div>
       <div style="margin-top:.7rem">
@@ -121,7 +142,7 @@
 
     <section class="panel span-6 anim-rise" style="--d:.05s" aria-label="Contact inbox">
       <div class="row-head" style="justify-content:space-between">
-        <span class="kicker" style="margin:0">📬 Contact inbox <span id="inbox-count" class="muted"></span></span>
+        <span class="kicker" style="margin:0"> Contact inbox <span id="inbox-count" class="muted"></span></span>
         <button class="btn btn-ghost btn-sm" id="inbox-reload">Reload</button>
       </div>
       <div id="inbox-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem"></div>
@@ -129,7 +150,7 @@
 
     <section class="panel span-6 anim-rise" style="--d:.05s" aria-label="Lecture feedback">
       <div class="row-head" style="justify-content:space-between">
-        <span class="kicker" style="margin:0">★ Feedback <span id="fb-count" class="muted"></span></span>
+        <span class="kicker" style="margin:0">Feedback <span id="fb-count" class="muted"></span></span>
         <button class="btn btn-ghost btn-sm" id="fb-reload">Reload</button>
       </div>
       <div id="fb-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem;max-height:22rem;overflow-y:auto"></div>
@@ -179,7 +200,7 @@
     me = r.user;
     var raw = fb.raw(); F = raw.S._fs; db = raw.S.sDb;
     ui.nav(); ui.authArea();
-    loadUsers(); loadAnns(); loadPresence(); loadMod(); loadInbox(); loadRefs(); loadVersions(); loadFeedback();
+    loadUsers(); loadAnns(); loadNotices(); loadPresence(); loadMod(); loadInbox(); loadRefs(); loadVersions(); loadFeedback();
     presenceTimer = setInterval(loadPresence, 8000);
   }).catch(function () {});
 
@@ -232,6 +253,7 @@
         "<button class='btn " + (u.banned ? "btn-secondary" : "btn-danger") + " btn-sm' data-a='ban'>" + (u.banned ? "Unban" : "Ban") + "</button>" +
         "<select class='input' data-a='plan' style='min-height:34px;font-size:.75rem;padding:.2rem .4rem'><option value=''>Plan…</option><option value='trial'>Trial 24h</option><option value='monthly'>Monthly 30d</option><option value='lifetime'>Lifetime</option><option value='__revoke__'>Revoke</option></select>" +
         "<button class='btn btn-secondary btn-sm' data-a='apply'>Set</button>" +
+        "<button class='btn btn-ghost btn-sm' data-a='strikes' title='Reset devtools warnings'>" + (u.strikes ? "! " + u.strikes + " reset" : "0 strikes") + "</button>" +
         "<button class='btn btn-ghost btn-sm' data-a='msg'>Msg</button>" +
         "</div></td>";
       tr.children[0].children[0].textContent = u.displayName || "(no name)";
@@ -257,6 +279,12 @@
           ui.toast("Saved", (u.email || u.id) + " → " + (v === "__revoke__" ? "revoked" : v));
           renderStats(); render();
         }).catch(function () { ui.toast("Failed", "Write denied"); });
+      });
+      tr.querySelector("[data-a='strikes']").addEventListener("click", function () {
+        if (!confirm("Reset " + (u.strikes || 0) + " strike(s) for " + (u.email || u.id) + " and unban them?")) return;
+        F.setDoc(F.doc(db, "users", u.id), { strikes: 0, banned: false, banReason: "", lastStrikeAt: 0 }, { merge: true })
+          .then(function () { ui.toast("Reset ✓", "Strikes cleared and user unbanned"); loadUsers(); })
+          .catch(function () { ui.toast("Failed", "Write denied"); });
       });
       tr.querySelector("[data-a='msg']").addEventListener("click", function () {
         selectTarget(u.id, u.displayName || u.email || u.id);
@@ -364,26 +392,25 @@
     startForce(text);
   });
   function startForce(text) {
+    var hours = Math.max(0, Math.min(720, Number(document.getElementById("force-hours").value) || 0));
+    var views = Math.max(0, Math.min(999, Number(document.getElementById("force-views").value) || 0));
     F.setDoc(F.doc(db, "forceMsgs", target.uid), {
-      text: text.slice(0, 1000), from: me.uid, fromName: "Admin", adminAt: Date.now(), allowLeave: false, sentAt: Date.now()
+      title: document.getElementById("force-title").value.trim().slice(0, 120) || "A message for you",
+      text: text.slice(0, 1000), from: me.uid, fromName: "Admin", adminAt: Date.now(),
+      createdAt: Date.now(), expiresAt: hours ? Date.now() + hours * 3600000 : 0,
+      maxViews: views, active: true, allowLeave: false, sentAt: Date.now()
     }).then(function () {
-      ui.toast("Force message live", target.name + " is now locked on it");
+      ui.toast("Force message live", target.name + " is locked on it until you end it" + (hours ? " or " + hours + "h passes" : ""));
       document.getElementById("force-end").style.display = "";
       document.getElementById("force-allow").style.display = "";
       document.getElementById("msg-text").value = "";
       if (forceTimer) clearInterval(forceTimer);
-      /* Heartbeat: while this panel keeps beating, the user stays locked.
-         Stop it (close panel / go idle) and the user is released after 2 min. */
-      forceTimer = setInterval(function () {
-        if (!target) return;
-        F.setDoc(F.doc(db, "forceMsgs", target.uid), { adminAt: Date.now() }, { merge: true }).catch(function () {});
-      }, 20000);
     }).catch(function () { ui.toast("Failed", "Write denied"); });
   }
   function stopForce(clearOnly) {
     if (!target) return;
     var p = clearOnly
-      ? F.setDoc(F.doc(db, "forceMsgs", target.uid), { adminAt: 0 }, { merge: true })
+      ? F.setDoc(F.doc(db, "forceMsgs", target.uid), { active: false, allowLeave: true, releasedAt: Date.now() }, { merge: true })
       : F.deleteDoc(F.doc(db, "forceMsgs", target.uid));
     p.then(function () {
       if (forceTimer) { clearInterval(forceTimer); forceTimer = null; }
@@ -395,7 +422,7 @@
   document.getElementById("force-end").addEventListener("click", function () { stopForce(false); });
   document.getElementById("force-allow").addEventListener("click", function () {
     if (!target) return;
-    F.setDoc(F.doc(db, "forceMsgs", target.uid), { allowLeave: true, adminAt: 0 }, { merge: true }).then(function () {
+    F.setDoc(F.doc(db, "forceMsgs", target.uid), { allowLeave: true, active: false, releasedAt: Date.now() }, { merge: true }).then(function () {
       if (forceTimer) { clearInterval(forceTimer); forceTimer = null; }
       document.getElementById("force-end").style.display = "none";
       document.getElementById("force-allow").style.display = "none";
@@ -461,6 +488,52 @@
     }).catch(function () { list.innerHTML = '<div class="muted" style="font-size:.75rem">Couldn\'t load.</div>'; });
   }
 
+  /* ---------- team notices ---------- */
+  async function loadNotices() {
+    var host = document.getElementById("nt-list");
+    if (!host) return;
+    host.innerHTML = '<div class="muted" style="font-size:.75rem">Loading…</div>';
+    var list = await fb.noticesAll(20).catch(function () { return []; });
+    host.innerHTML = list.length ? "" : '<div class="muted" style="font-size:.75rem">No notices yet.</div>';
+    list.forEach(function (n) {
+      var row = document.createElement("div");
+      row.className = "row-card";
+      row.style.padding = ".55rem .75rem";
+      var meta = [n.audience === "user" ? "user " + String(n.uid || "").slice(0, 14) : "everyone",
+        n.maxViews ? n.maxViews + " views" : "unlimited views",
+        n.expiresAt ? "ends " + new Date(n.expiresAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "no timer"].join(" · ");
+      row.innerHTML = '<div class="row-head" style="justify-content:space-between"><b style="font-size:.82rem"></b>' +
+        '<button class="btn btn-ghost btn-sm" data-a="toggle">' + (n.active === false ? "Activate" : "Deactivate") + "</button></div>" +
+        '<div class="muted" style="font-size:.78rem;white-space:pre-wrap"></div><div class="mono muted" style="font-size:.62rem;margin-top:.2rem"></div>';
+      row.querySelector("b").textContent = n.title || "Notice";
+      row.querySelectorAll("div")[1].textContent = n.body || "";
+      row.querySelectorAll("div")[2].textContent = meta + " · " + timeAgo(n.createdAt);
+      row.querySelector("[data-a='toggle']").addEventListener("click", function () {
+        fb.setNoticeActive(n.id, n.active === false).then(function () { ui.toast("Updated", "Notice visibility changed"); loadNotices(); })
+          .catch(function () { ui.toast("Failed", "Write denied"); });
+      });
+      host.appendChild(row);
+    });
+  }
+  document.getElementById("nt-add").addEventListener("click", async function () {
+    var title = document.getElementById("nt-title").value.trim(), body = document.getElementById("nt-body").value.trim();
+    if (!title || !body) return ui.toast("Missing fields", "Add a title and message");
+    var uid = document.getElementById("nt-uid").value.trim();
+    var hours = Math.max(0, Math.min(8760, Number(document.getElementById("nt-hours").value) || 0));
+    var views = Math.max(0, Math.min(999, Number(document.getElementById("nt-views").value) || 0));
+    try {
+      await fb.createNotice({
+        title: title, body: body,
+        audience: uid ? "user" : "all", uid: uid,
+        expiresAt: hours ? Date.now() + hours * 3600000 : 0, maxViews: views
+      });
+      ui.toast("Published ✓", uid ? "Sent to one user" : "Sent to everyone");
+      ["nt-title", "nt-body", "nt-uid"].forEach(function (id) { document.getElementById(id).value = ""; });
+      loadNotices();
+    } catch (e) { ui.toast("Failed", (e && e.message) || "Write denied"); }
+  });
+  document.getElementById("nt-reload").addEventListener("click", loadNotices);
+
   /* ---------- moderation ---------- */
   function loadMod() {
     var rlist = document.getElementById("report-list"), mlist = document.getElementById("mod-list");
@@ -469,14 +542,21 @@
       var reps = [];
       snap.forEach(function (d) { reps.push(Object.assign({ id: d.id }, d.data() || {})); });
       document.getElementById("mod-count").textContent = "(" + reps.length + " reports)";
-      rlist.innerHTML = reps.length ? "" : '<div class="muted" style="font-size:.78rem">No reports 🎉</div>';
+      rlist.innerHTML = reps.length ? "" : '<div class="muted" style="font-size:.78rem">No reports </div>';
       reps.forEach(function (r) {
         var row = document.createElement("div");
         row.className = "row-card";
         row.style.padding = ".55rem .75rem";
-        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.8rem"></div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-ghost btn-sm" data-a="del">Del post</button><button class="btn btn-ghost btn-sm" data-a="dis">Dismiss</button></div>';
+        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.8rem"></div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-primary btn-sm" data-a="reply">Reply</button><button class="btn btn-ghost btn-sm" data-a="del">Del post</button><button class="btn btn-ghost btn-sm" data-a="dis">Dismiss</button></div>';
         row.querySelector("div div").textContent = r.reason || "Reported";
         row.querySelector("div div + div").textContent = "post " + String(r.postId || "").slice(0, 14) + "… · " + timeAgo(r.at);
+        row.querySelector("[data-a='reply']").addEventListener("click", function () {
+          var text = prompt("Reply to " + (r.by || "this user") + " — it lands in their inbox:");
+          if (!text || !text.trim()) return;
+          fb.replyReport(r, text.trim(), me.displayName || "Admin").then(function () {
+            ui.toast("Reply sent ✓", "It's in their inbox and notification bell"); loadMod();
+          }).catch(function (e) { ui.toast("Failed", (e && e.message) || "Try again"); });
+        });
         row.querySelector("[data-a='del']").addEventListener("click", function () {
           if (!confirm("Delete the reported post?")) return;
           F.deleteDoc(F.doc(db, "posts", r.postId)).then(function () { return F.deleteDoc(F.doc(db, "post_reports", r.id)); })
@@ -525,16 +605,58 @@
         el.style.padding = ".55rem .75rem";
         el.style.opacity = m.status === "resolved" ? ".55" : "1";
         el.innerHTML = '<div style="font-weight:700;font-size:.82rem"></div><div class="muted" style="font-size:.78rem;white-space:pre-wrap"></div>' +
-          '<div class="act-bar">' + (m.status !== "resolved" ? '<button class="btn btn-ghost btn-sm" data-a="ok">Resolve</button>' : "") + '<button class="btn btn-ghost btn-sm" data-a="del">Delete</button></div>';
+          '<div class="act-bar">' +
+          (m.uid ? '<button class="btn btn-secondary btn-sm" data-a="reply">Reply in Messages</button>' : "") +
+          (!m.uid && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(m.email || "")) ? '<a class="btn btn-secondary btn-sm" data-a="email">Reply by email</a>' : "") +
+          (m.status !== "resolved" ? '<button class="btn btn-ghost btn-sm" data-a="ok">Resolve</button>' : "") +
+          '<button class="btn btn-ghost btn-sm" data-a="del">Delete</button></div>';
         el.querySelector("div").textContent = m.subject || "(no subject)";
         el.querySelectorAll("div")[1].textContent = (m.name || "User") + (m.email ? " · " + m.email : "") + " — " + (m.message || "");
+        var reply = el.querySelector("[data-a='reply']");
+        if (reply) reply.addEventListener("click", function () {
+          reply.disabled = true;
+          var composer = document.createElement("div");
+          composer.style.cssText = "display:flex;gap:.45rem;align-items:flex-end;margin-top:.6rem";
+          composer.innerHTML = '<textarea class="input" rows="2" maxlength="1000" aria-label="Reply message" placeholder="Write a reply…" style="font-size:.82rem;resize:vertical;flex:1"></textarea>' +
+            '<button class="btn btn-primary btn-sm" data-a="send">Send</button>' +
+            '<button class="btn btn-ghost btn-sm" data-a="cancel">Cancel</button>';
+          el.appendChild(composer);
+          var input = composer.querySelector("textarea");
+          input.focus();
+          composer.querySelector("[data-a='cancel']").addEventListener("click", function () {
+            composer.remove();
+            reply.disabled = false;
+          });
+          composer.querySelector("[data-a='send']").addEventListener("click", function () {
+            var text = input.value.trim(), send = composer.querySelector("[data-a='send']");
+            if (!text) { input.focus(); return; }
+            send.disabled = true;
+            fb.sendMsg(fb.threadId(me.uid, String(m.uid)), text).then(function () {
+              return F.setDoc(F.doc(db, "contact_messages", m.id), { status: "resolved", repliedAt: Date.now() }, { merge: true });
+            }).then(function () {
+              ui.toast("Reply sent", "The user can continue the conversation in Messages.");
+              loadInbox();
+            }).catch(function () {
+              send.disabled = false;
+              ui.toast("Reply failed", "The message could not be delivered.");
+            });
+          });
+        });
+        var emailReply = el.querySelector("[data-a='email']");
+        if (emailReply) {
+          emailReply.href = "mailto:" + encodeURIComponent(String(m.email)) +
+            "?subject=" + encodeURIComponent("Re: " + String(m.subject || "Your StudiKitEZ message"));
+        }
         var ok = el.querySelector("[data-a='ok']");
         if (ok) ok.addEventListener("click", function () {
-          F.setDoc(F.doc(db, "contact_messages", m.id), { status: "resolved" }, { merge: true }).then(function () { loadInbox(); }).catch(function () {});
+          F.setDoc(F.doc(db, "contact_messages", m.id), { status: "resolved" }, { merge: true })
+            .then(function () { loadInbox(); })
+            .catch(function () { ui.toast("Update failed", "The message could not be resolved."); });
         });
         el.querySelector("[data-a='del']").addEventListener("click", function () {
           if (!confirm("Delete?")) return;
-          F.deleteDoc(F.doc(db, "contact_messages", m.id)).then(function () { loadInbox(); }).catch(function () {});
+          F.deleteDoc(F.doc(db, "contact_messages", m.id)).then(function () { loadInbox(); })
+            .catch(function () { ui.toast("Delete failed", "The message could not be removed."); });
         });
         list.appendChild(el);
       });
@@ -595,7 +717,7 @@
         el.className = "row-card";
         el.style.padding = ".55rem .75rem";
         el.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.8rem"></div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-ghost btn-sm">Delete</button></div>' +
-          '<div class="stars" style="margin-top:.3rem;pointer-events:none">' + [1,2,3,4,5].map(function (i) { return '<span class="star' + (i <= (f.rating || 0) ? " on" : "") + '" style="font-size:.95rem">★</span>'; }).join("") + "</div>" +
+          '<div class="stars" style="margin-top:.3rem;pointer-events:none">' + [1,2,3,4,5].map(function (i) { return '<span class="star' + (i <= (f.rating || 0) ? " on" : "") + '" style="font-size:.95rem">*</span>'; }).join("") + "</div>" +
           '<div class="muted" style="font-size:.78rem;margin-top:.3rem;white-space:pre-wrap"></div>';
         el.querySelector("div div").textContent = f.title || ("content " + f.contentId);
         el.querySelector("div div + div").textContent = (f.improve ? "Improve: " + f.improve : "") + (f.add ? " · Add: " + f.add : "") + " · " + timeAgo(f.at);
@@ -624,7 +746,7 @@
         var row = document.createElement("div");
         row.className = "row-card";
         row.style.padding = ".55rem .75rem";
-        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.82rem">+1 day ad-free</div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-primary btn-sm">Grant</button></div>';
+        row.innerHTML = '<div class="row-head"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.82rem">Referral credit</div><div class="mono muted" style="font-size:.62rem"></div></div><button class="btn btn-primary btn-sm">Grant</button></div>';
         row.querySelector("div div + div").textContent = "new: " + String(c.id).slice(0, 10) + "… · ref: " + String(c.by || "").slice(0, 10) + "… · " + timeAgo(c.at);
         row.querySelector("button").addEventListener("click", function () {
           var uref = F.doc(db, "users", c.by);
@@ -632,7 +754,7 @@
             var old = us.exists() ? (us.data().freeUntil || 0) : 0;
             return F.setDoc(uref, { freeUntil: Math.max(Date.now(), old) + 86400000 }, { merge: true });
           }).then(function () { return F.setDoc(F.doc(db, "referral_claims", c.id), { granted: true }, { merge: true }); })
-            .then(function () { ui.toast("Granted", "+1 day ad-free"); loadRefs(); })
+            .then(function () { ui.toast("Granted", "Referral credit added"); loadRefs(); })
             .catch(function () { ui.toast("Failed", "Denied"); });
         });
         list.appendChild(row);

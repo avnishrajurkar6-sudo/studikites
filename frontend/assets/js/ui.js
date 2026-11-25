@@ -1,6 +1,6 @@
 /* StudiKitEZ — shared UI v3
    One shell for every page: sticky nav, mobile dock, notification bell,
-   force-message overlay, devtools guard (3 strikes -> ban), motion, toasts.
+   force-message overlay, devtools guard, motion, toasts.
    No trackers. No redirect loops. */
 window.SK = window.SK || {};
 window.SK.ui = (function () {
@@ -221,9 +221,11 @@ window.SK.ui = (function () {
     if (!host) return;
     var u = shellUser;
     if (!u) { try { u = await window.SK.fb.currentUser(); } catch (e) { u = null; } }
+    var authKey = u ? String(u.uid) : "guest";
+    if (host.getAttribute("data-auth-user") === authKey) return;
+    host.setAttribute("data-auth-user", authKey);
     if (!u) {
-      host.innerHTML = '<a class="btn btn-ghost btn-sm" href="login.html?next=' + encodeURIComponent(nextTarget()) + '">Sign in</a>' +
-        '<a class="btn btn-primary btn-sm" href="login.html?next=' + encodeURIComponent(nextTarget()) + '">Join free</a>';
+      host.innerHTML = '<a class="btn btn-primary btn-sm" href="login.html?next=' + encodeURIComponent(nextTarget()) + '">Sign in</a>';
       return;
     }
     shellUser = u;
@@ -278,7 +280,7 @@ window.SK.ui = (function () {
     var memberLinks = $$('.nav-links a[href="dashboard.html"], .nav-links a[href="focus.html"], .nav-links a[href="msgs.html"], #mobile-menu a[href="dashboard.html"], #mobile-menu a[href="focus.html"], #mobile-menu a[href="msgs.html"], #mobile-menu a[href="onboarding.html"]');
     memberLinks.forEach(function (a) { a.hidden = true; });
     window.SK.fb.currentUser().then(function (u) {
-      rewriteTelegramLinks(u);
+      rewriteTelegramLinks();
       memberLinks.forEach(function (a) {
         a.hidden = false;
         if (!u) a.style.display = "none";
@@ -293,6 +295,7 @@ window.SK.ui = (function () {
         if (!u) bell.closest(".bell-wrap").remove();
         else bell.closest(".bell-wrap").hidden = false;
       }
+      if (u) announcePopup();
     }).catch(function () {
       memberLinks.forEach(function (a) { a.hidden = false; a.style.display = "none"; });
       var dock = document.getElementById("sk-dock");
@@ -306,41 +309,72 @@ window.SK.ui = (function () {
   }
 
   /* ---------------- telegram ---------------- */
-  function botUrl(u) {
+  function botUrl(payload) {
     var base = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/Studikitesbot";
-    if (!u || !u.uid) return base;
-    var tag = "vme_" + String(u.uid).replace(/[^A-Za-z0-9_]/g, "").slice(0, 48);
-    return base.replace(/\/+$/, "") + "?start=" + tag;
+    return payload ? base.replace(/\/+$/, "") + "?start=" + encodeURIComponent(payload) : base;
   }
-  function rewriteTelegramLinks(u) {
-    var url = botUrl(u);
+  function rewriteTelegramLinks() {
+    var url = botUrl();
     if (window.__SK__) window.__SK__.telegramUrl = url;
     $$('a[href*="t.me/"]').forEach(function (a) { try { a.href = url; } catch (e) { } });
   }
   function telegram() {
-    if (document.getElementById("tg-widget") || isAuthPage()) return;
-    var w = document.createElement("div");
-    w.className = "tg-widget"; w.id = "tg-widget";
-    w.innerHTML = '<span>New batches on <a href="https://t.me/Studikitesbot" target="_blank" rel="noopener">Telegram</a></span><button aria-label="Dismiss">×</button>';
-    w.querySelector("a").href = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/Studikitesbot";
-    w.querySelector("button").addEventListener("click", function () { w.remove(); });
-    document.body.appendChild(w);
+    var widget = document.getElementById("tg-widget");
+    if (widget) widget.remove();
   }
+  var telegramPromptBusy = false;
   function telegramNag() {
-    if (isAuthPage()) return;
-    if (sstore("sk_tg_nag") === "1") return;
-    setTimeout(function () {
-      if (modalHost) { setTimeout(telegramNag, 8000); return; }
-      var url = (window.__SK__ && window.__SK__.telegramUrl) || "https://t.me/Studikitesbot";
-      var m = modal(
-        '<span class="kicker">Stay updated</span><h3 style="margin:.5rem 0 .35rem">Join our Telegram</h3>' +
-        '<p class="muted" style="margin:0;font-size:.95rem;line-height:1.55">New batches, live classes and exam alerts — pushed instantly.</p>' +
-        '<div style="display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap">' +
-        '<a class="btn btn-primary btn-sm" id="tg-join" target="_blank" rel="noopener">Join channel →</a>' +
-        '<button class="btn btn-ghost btn-sm" id="tg-x">Not now</button></div>');
-      m.querySelector("#tg-join").href = url;
-      m.querySelector("#tg-x").addEventListener("click", function () { sstore("sk_tg_nag", "1"); closeModal(); });
-    }, 9000);
+    var widget = document.getElementById("tg-widget");
+    if (widget) widget.remove();
+    if (telegramPromptBusy || isAuthPage()) return;
+    telegramPromptBusy = true;
+    (async function () {
+      try {
+        var user = await window.SK.fb.currentUser();
+        if (!user) return;
+        var dismissedKey = "sk_tg_dismissed_" + user.uid;
+        if (store(dismissedKey) === "1" || sstore("sk_tg_linking_" + user.uid) === "1") return;
+        var profile = await window.SK.fb.userDoc(user.uid);
+        if (profile && profile.telegramVerified === true) return;
+        if (modalHost) {
+          setTimeout(function () { telegramPromptBusy = false; telegramNag(); }, 2500);
+          return;
+        }
+        var dialog = modal(
+          '<span class="kicker">Account verification</span>' +
+          '<h3 style="margin:.5rem 0 .4rem">Verify your Telegram account</h3>' +
+          '<p class="muted" style="margin:0;font-size:.92rem;line-height:1.55">Open the StudiKitEZ bot from your account to verify Telegram. This links your Telegram profile to your signed-in account.</p>' +
+          '<div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">' +
+          '<button class="btn btn-primary btn-sm" id="tg-verify">Verify with Telegram</button>' +
+          '<button class="btn btn-ghost btn-sm" id="tg-later">Not now</button></div>');
+        dialog.querySelector("#tg-later").addEventListener("click", function () {
+          store(dismissedKey, "1");
+          closeModal();
+        });
+        dialog.querySelector("#tg-verify").addEventListener("click", async function (event) {
+          var button = event.currentTarget;
+          button.disabled = true;
+          var tab = window.open("about:blank", "_blank");
+          try {
+            var link = await window.SK.api.createTelegramLink();
+            if (!link || !link.token) throw new Error("Telegram verification link could not be created");
+            sstore("sk_tg_linking_" + user.uid, "1");
+            var target = botUrl("skv1_" + link.token);
+            closeModal();
+            if (tab) tab.location.replace(target);
+            else location.href = target;
+          } catch (error) {
+            if (tab) tab.close();
+            button.disabled = false;
+            toast("Telegram verification unavailable", error.message || "Please try again later.");
+          }
+        });
+      } catch (error) {
+        toast("Telegram status unavailable", "Please reload and try again later.");
+      } finally {
+        telegramPromptBusy = false;
+      }
+    })();
   }
 
   /* ---------------- notification bell ---------------- */
@@ -352,7 +386,7 @@ window.SK.ui = (function () {
     var wrap = document.createElement("div");
     wrap.className = "bell-wrap";
     wrap.hidden = true;
-    wrap.innerHTML = '<button class="iconbtn bell-btn" id="notice-bell" aria-label="Notifications" aria-haspopup="dialog">Alerts<span class="notice-dot" hidden></span></button>';
+    wrap.innerHTML = '<button class="iconbtn bell-btn" id="notice-bell" aria-label="Notifications" aria-haspopup="dialog">Notifications<span class="notice-dot" hidden></span></button>';
     if (host.id === "auth-area") host.parentNode.insertBefore(wrap, host);
     else host.insertBefore(wrap, host.firstChild);
     wrap.querySelector("#notice-bell").addEventListener("click", openNoticePanel);
@@ -576,62 +610,89 @@ window.SK.ui = (function () {
     el.querySelector("#force-state").textContent = "Waiting for the admin…";
   }
 
-  /* ---------------- devtools guard: 3 warnings -> auto-ban ---------------- */
-  var guardStarted = false, guardHits = 0, guardWarned = false, guardKnown = false;
+  /* ---------------- devtools guard: confirmed detection -> auto-ban ---------------- */
+  var guardStarted = false, guardHits = 0, guardWarned = false;
+  var guardAdminValue = null, guardAdminCheckedAt = 0, guardAdminPromise = null, guardTickBusy = false;
+  async function guardAdminStatus(user, force) {
+    if (guardAdminPromise) return guardAdminPromise;
+    if (!force && guardAdminCheckedAt && Date.now() - guardAdminCheckedAt < 12000) {
+      return guardAdminValue;
+    }
+    guardAdminPromise = window.SK.fb.verifyAdmin(user.uid).then(function (admin) {
+      guardAdminValue = admin === true;
+      guardAdminCheckedAt = Date.now();
+      shellAdmin = guardAdminValue;
+      return guardAdminValue;
+    }).catch(function () {
+      guardAdminValue = null;
+      guardAdminCheckedAt = Date.now();
+      return null;
+    }).finally(function () { guardAdminPromise = null; });
+    return guardAdminPromise;
+  }
   function startGuard() {
-    if (guardStarted || reduced()) return;
+    if (guardStarted) return;
     guardStarted = true;
-    if (shellAdmin || sstore("sk_guard_off") === "1") return;
     var baseW = window.outerWidth, baseH = window.outerHeight;
     var lastW = baseW, lastH = baseH;
-    var timer = setInterval(function () {
-      if (document.hidden) return;
-      var w = window.outerWidth, h = window.outerHeight;
-      var docked = Math.abs(w - lastW) > 150 || Math.abs(h - lastH) > 150;
-      lastW = w; lastH = h;
-      var t0 = 0, dt = 0;
-      try { t0 = performance.now(); /* eslint-disable no-debugger */ debugger; dt = performance.now() - t0; } catch (e) { dt = 0; }
-      var open = docked || dt > 260;
-      if (open) guardHits++; else guardHits = Math.max(0, guardHits - 1);
-      if (guardHits >= 2 && !guardWarned) {
-        guardHits = 0;
-        guardWarned = true;
-        onDevtools();
-        setTimeout(function () { guardWarned = false; }, 2500);
+    var timer = setInterval(async function () {
+      if (guardTickBusy) return;
+      guardTickBusy = true;
+      try {
+        var user = shellUser || await window.SK.fb.currentUser();
+        if (!user) return;
+        shellUser = user;
+        var admin = await guardAdminStatus(user, false);
+        if (admin !== false || document.hidden) {
+          guardHits = 0;
+          return;
+        }
+        var w = window.outerWidth, h = window.outerHeight;
+        var docked = Math.abs(w - lastW) > 150 || Math.abs(h - lastH) > 150;
+        lastW = w; lastH = h;
+        var t0 = 0, dt = 0;
+        try { t0 = performance.now(); /* eslint-disable no-debugger */ debugger; dt = performance.now() - t0; } catch (e) { dt = 0; }
+        var open = docked || dt > 260;
+        if (open) guardHits++; else guardHits = Math.max(0, guardHits - 1);
+        if (guardHits >= 2 && !guardWarned) {
+          guardHits = 0;
+          guardWarned = true;
+          onDevtools(user).finally(function () {
+            setTimeout(function () { guardWarned = false; }, 2500);
+          });
+        }
+      } finally {
+        guardTickBusy = false;
       }
     }, 1800);
     window.addEventListener("pagehide", function () { clearInterval(timer); });
   }
-  async function onDevtools() {
-    var u = shellUser;
-    if (!u) { try { u = await window.SK.fb.currentUser(); } catch (e) { } }
+  async function onDevtools(u) {
+    u = u || shellUser;
     if (!u) return;
-    if (isAdminPage() || shellAdmin) return;
-    var localKey = "sk_strikes_" + u.uid;
-    var localN = parseInt(store(localKey) || "0", 10) || 0;
-    var res = null;
-    try { res = await window.SK.fb.recordStrike(u.uid, "devtools"); } catch (e) { res = null; }
-    var n = res && res.strikes ? res.strikes : Math.min(3, localN + 1);
-    store(localKey, String(n));
-    if ((res && res.banned) || n >= 3) {
-      showGuardBan();
+    var admin = await guardAdminStatus(u, true);
+    if (admin !== false) return;
+    var result;
+    try { result = await window.SK.fb.recordStrike(u.uid, "devtools"); }
+    catch (error) {
+      toast("Security check unavailable", "Your account could not be checked. Please try again.");
       return;
     }
-    var m = modal(
-      '<div style="text-align:center">' +
-      '<span class="kicker" style="border-color:var(--danger);color:var(--danger)">Security warning ' + n + ' of 3</span>' +
-      '<h3 style="margin:.6rem 0 .4rem">Developer tools detected</h3>' +
-      '<p class="muted" style="margin:0;font-size:.9rem;line-height:1.55">StudiKitEZ protects lectures and notes. Opening developer tools on protected pages is recorded as a strike. ' +
-      '<b style="color:var(--danger)">3 strikes suspends your account automatically.</b></p>' +
-      '<button class="btn btn-primary btn-sm" id="guard-ok" style="margin-top:1rem">I understand</button></div>', { locked: true });
-    m.querySelector("#guard-ok").addEventListener("click", function () { closeModal(); });
+    if (result && result.ignored) return;
+    if (result && result.offline) {
+      toast("Security check unavailable", "Your account could not be checked. Please try again.");
+      return;
+    }
+    if (result && result.banned) {
+      showGuardBan();
+    }
   }
   function showGuardBan() {
     var m = modal(
       '<div style="text-align:center">' +
       '<span class="kicker" style="border-color:var(--danger);color:var(--danger)">Account suspended</span>' +
       '<h3 style="margin:.6rem 0 .4rem">Too many security warnings</h3>' +
-      '<p class="muted" style="margin:0;font-size:.9rem;line-height:1.55">Your account was automatically suspended after 3 developer-tools warnings. Contact support if you believe this is a mistake.</p>' +
+      '<p class="muted" style="margin:0;font-size:.9rem;line-height:1.55">Your account was automatically suspended after developer tools were detected. Contact support if you believe this is a mistake.</p>' +
       '<a class="btn btn-primary btn-sm" href="banned.html" style="margin-top:1rem">See details</a></div>', { locked: true });
     setTimeout(function () { location.href = "banned.html"; }, 1800);
     void m;
@@ -690,6 +751,7 @@ window.SK.ui = (function () {
     gateNav();
     aiWidget();
     initShell({});
+    authArea();
     if (window.SK.fb && typeof window.SK.fb.presenceBeat === "function") Promise.resolve(window.SK.fb.presenceBeat()).catch(function () { });
   }
 
@@ -749,23 +811,32 @@ window.SK.ui = (function () {
   }
 
   /* ---------------- announcements ---------------- */
-  var annQueue = [], annBusy = false;
+  var annQueue = [], annBusy = false, annUserId = "";
+  var announcementsLoading = false;
   async function announcePopup() {
+    if (announcementsLoading || isAuthPage()) return;
+    announcementsLoading = true;
     try {
+      var user = await window.SK.fb.currentUser();
+      if (!user) return;
       var list = await window.SK.fb.announcements(8);
       if (!list.length) return;
+      annUserId = String(user.uid);
       annQueue = list.filter(function (a) {
-        try { return !localStorage.getItem("sk_ann_" + a.id); } catch (e) { return true; }
+        try { return !localStorage.getItem("sk_ann_" + annUserId + "_" + a.id); } catch (e) { return true; }
       });
       if (!annQueue.length) return;
       if (!annBusy) nextAnn();
-    } catch (e) { }
+    } catch (e) {
+      toast("Announcements unavailable", "Please try again later.");
+    }
+    finally { announcementsLoading = false; }
   }
   function nextAnn() {
     if (!annQueue.length) { annBusy = false; return; }
     annBusy = true;
     var a = annQueue.shift();
-    try { localStorage.setItem("sk_ann_" + a.id, "1"); } catch (e) { }
+    try { localStorage.setItem("sk_ann_" + annUserId + "_" + a.id, "1"); } catch (e) { }
     var m = modal(
       '<span class="kicker">Announcement' + (annQueue.length ? " · " + (annQueue.length + 1) + " more" : "") + "</span>" +
       '<h3 style="margin:.5rem 0 .35rem">' + esc(a.title) + "</h3>" +

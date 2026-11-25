@@ -6,6 +6,8 @@ module.exports = async function handler(req, res) {
   return sendJson(req, res, 200, {
     ok: true,
     service: "studikitez-backend",
+    engine: "AVkings Engine",
+    brand: "AVkings",
     time: new Date().toISOString(),
   });
 };
