@@ -690,7 +690,7 @@ window.SK.ui = (function () {
     gateNav();
     aiWidget();
     initShell({});
-    if (window.SK.fb) window.SK.fb.presenceBeat().catch(function () { });
+    if (window.SK.fb && typeof window.SK.fb.presenceBeat === "function") Promise.resolve(window.SK.fb.presenceBeat()).catch(function () { });
   }
 
   /* ---------------- boot / gate ---------------- */

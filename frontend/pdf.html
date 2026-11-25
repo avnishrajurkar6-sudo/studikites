@@ -143,7 +143,7 @@
     }
     setDocTitle(d.title || hintedTitle || "Document");
     pdfUrl = d.file_url;
-    SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
+    if (typeof SK.fb.presenceBeat === "function") SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
     try {
       /* CMaps + standard fonts: required for Devanagari/CJK text PDFs, and
          the reason some notes rendered as blank white pages. */

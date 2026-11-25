@@ -121,7 +121,7 @@
     if (hit) { info = hit; courseId = String(hit.id); }
     document.title = "StudiKitEZ — " + info.title;
     try { sessionStorage.setItem("sk_title_" + courseId, info.title); } catch (e) {}
-    SK.fb.presenceBeat(undefined, "browsing · " + info.title);
+    if (typeof SK.fb.presenceBeat === "function") SK.fb.presenceBeat(undefined, "browsing · " + info.title);
     document.getElementById("course-title").textContent = info.title;
     if (info.thumbnail) {
       var im = document.getElementById("banner-img");
