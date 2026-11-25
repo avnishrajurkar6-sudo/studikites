@@ -1,0 +1,155 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    /*
+     * StudiKitEZ — AVkings security rules
+     *
+     * Phone learners have a backend-signed session rather than Firebase Auth.
+     * Their private profile and inbox are accessed through the backend's
+     * Firebase service account; all browser profile reads are owner/admin only.
+     * Learner writes cannot set role, ban, or subscription fields.
+     *
+     * Admin bootstrap: an allowlisted Google admin can verify through
+     * /api/auth/is-admin. Firestore admin writes require a role set through
+     * the Firebase console for the first admin.
+     */
+
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(db)/documents/users/$(request.auth.uid))
+        && get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function ownsUser(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function privilegedUserKeys() {
+      return [
+        'role', 'roleAt', 'admin', 'isAdmin',
+        'banned', 'banReason', 'bannedAt', 'banUntil', 'banBy',
+        'telegramVerified', 'telegramUserId', 'telegramUsername', 'telegramLinkedAt', 'telegramDisplayName',
+        'subscription', 'subscriptionExpires', 'freeUntil', 'plan',
+        'forceMsg', 'force', 'blocked', 'verified', 'bypassGuard'
+      ];
+    }
+
+    function safeUserUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(privilegedUserKeys()) == false;
+    }
+
+    /* A confirmed devtools strike immediately suspends a non-admin account. */
+    function strikeUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['strikes', 'lastStrikeAt', 'strikeReason', 'banned', 'banReason', 'bannedAt'])
+        && request.resource.data.strikes == (resource.data.get('strikes', 0) + 1)
+        && request.resource.data.get('banned', false) == true;
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    /* ---------------- learner profiles ---------------- */
+    match /users/{uid} {
+      allow read: if ownsUser(uid) || isAdmin();
+      /* Phone profiles are created through the verified backend session. */
+      allow create: if ownsUser(uid)
+        && request.resource.data.get('banned', false) == false
+        && request.resource.data.keys().hasAny(privilegedUserKeys()) == false;
+      allow update: if isAdmin()
+        || (ownsUser(uid) && safeUserUpdate())
+        || (ownsUser(uid) && strikeUpdate());
+      allow delete: if false;
+
+      match /inbox/{msg} {
+        allow read: if ownsUser(uid) || isAdmin();
+        allow create: if isAdmin()
+          || (request.auth != null
+            && request.resource.data.keys().hasOnly([
+              'from', 'fromName', 'authorRole', 'text', 'at', 'read', 'kind', 'thread'
+            ])
+            && request.resource.data.get('from', '') == request.auth.uid
+            && request.resource.data.get('authorRole', '') == 'user'
+            && request.resource.data.get('text', '') is string
+            && request.resource.data.text.size() <= 200
+            && request.resource.data.get('kind', '') == 'general'
+            && request.resource.data.get('read', false) == false
+            && request.resource.data.get('thread', '') in [
+              uid + '__' + request.auth.uid,
+              request.auth.uid + '__' + uid
+            ]);
+        allow update: if isAdmin() || (ownsUser(uid) && changedOnly(['read', 'readAt']));
+        allow delete: if false;
+      }
+      match /noticeViews/{id} {
+        allow read, create, update: if ownsUser(uid) || isAdmin();
+        allow delete: if false;
+      }
+    }
+
+    /* ---------------- learning data ---------------- */
+    match /progress/{uid}/batches/{batch} { allow read, write: if true; }
+    match /studyLog/{id} { allow read, create: if true; allow update: if changedOnly(['minutes', 'at']); allow delete: if false; }
+    match /notes/{id} { allow read, write: if true; }
+    match /referral_claims/{id} { allow read, create: if true; allow update: if changedOnly(['granted', 'grantedAt']); allow delete: if false; }
+    match /presence/{uid} { allow read, write: if true; }
+
+    /* notes/chat attached to a lecture */
+    match /lecture_chats/{thread}/messages/{msg} { allow read, create: if true; allow update, delete: if false; }
+
+    /* ---------------- social ---------------- */
+    match /focus_rooms/{room} {
+      allow read, write: if true;
+      match /messages/{msg} { allow read, create: if true; allow update, delete: if false; }
+    }
+    match /threads/{id} {
+      allow read, create: if true;
+      allow update: if changedOnly(['lastText', 'lastAt', 'lastBy', 'lastRole', 'community']);
+      allow delete: if false;
+      match /messages/{msg} { allow read, create: if true; allow update, delete: if false; }
+    }
+    match /posts/{id} {
+      allow read, create: if true;
+      allow update: if isAdmin() || changedOnly(['likes', 'likeCount', 'reports']);
+      allow delete: if isAdmin();
+      match /likes/{uid} { allow read, create: if true; allow delete: if false; }
+      match /comments/{cid} { allow read, create: if true; allow update, delete: if false; }
+    }
+
+    /* ---------------- moderation ---------------- */
+    match /post_reports/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAdmin() || changedOnly(['status']);
+      allow delete: if false;
+    }
+    match /contact_messages/{id} { allow read: if isAdmin(); allow create: if true; allow update, delete: if false; }
+    match /feedback/{id} { allow read: if isAdmin(); allow create: if true; allow update, delete: if false; }
+    match /waitlist/{id} { allow read: if isAdmin(); allow create: if true; allow update, delete: if false; }
+
+    /* ---------------- team-controlled content ---------------- */
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /notices/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /forceMsgs/{uid} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /forceViews/{uid} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+    match /app/{ver} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

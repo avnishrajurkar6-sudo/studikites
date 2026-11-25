@@ -1,0 +1,11 @@
+{
+  "name": "studikitez-backend",
+  "private": true,
+  "version": "2.0.0",
+  "description": "StudiKitEZ API — AVkings Engine. Secured serverless backend for OTP, catalog, and media.",
+  "author": "AVkings",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  }
+}
