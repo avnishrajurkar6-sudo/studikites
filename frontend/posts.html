@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Community Posts — StudiKitEZ</title>
 <meta name="description" content="Share study ideas, ask doubts and discuss with the StudiKitEZ community." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -59,11 +60,10 @@
   <div id="feed-loading" style="display:grid;place-items:center;padding:2.5rem 0"><div class="spinner"></div></div>
   <div id="feed-empty" class="empty" style="display:none"><h3>No posts yet</h3><p>Be the first to share something!</p></div>
 
-  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 </div></main>
 
 <footer class="site-footer"><div class="wrap">
-  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span>
   <span style="display:flex;gap:1rem">
     <a href="contact.html" style="font-size:.85rem">Contact</a>
     <a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.85rem">Telegram</a>
@@ -75,7 +75,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
@@ -235,7 +234,6 @@
           card.style.setProperty("--d", Math.min(i * 0.04, 0.4) + "s");
           feed.appendChild(card);
         });
-        SK.ads.render();
       });
     }).catch(function () {
       document.getElementById("feed-loading").style.display = "none";
@@ -263,7 +261,6 @@
     }).catch(function () { ui.toast("Couldn't post", "Write denied"); })
       .then(function () { btn.disabled = false; });
   });
-  SK.ads.render();
 })();
 </script>
 </body>

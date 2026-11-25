@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Focus Rooms — StudiKitEZ</title>
 <meta name="description" content="Pomodoro focus rooms: study together, stay accountable." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -92,11 +93,10 @@
       <div id="rooms" class="cards"></div>
     </section>
   </div>
-  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 </div></main>
 
 <footer class="site-footer"><div class="wrap">
-  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span>
   <a href="dashboard.html" style="font-size:.85rem">Dashboard</a>
 </div></footer>
 
@@ -105,7 +105,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
@@ -190,7 +189,7 @@
           renderDots();
           ui.toast("Focus block done ✓", focusMin + " min logged — take " + breakMin + " off");
           stats();
-        } else { ui.toast("Break over", "Back to focus 🌿"); stats(); }
+        } else { ui.toast("Break over", "Back to focus "); stats(); }
         onBreak = !onBreak;
         remaining = (onBreak ? breakMin : focusMin) * 60;
       }
@@ -206,7 +205,7 @@
       var today = 0;
       try { today = parseInt(localStorage.getItem("sk_focus_done_" + fb.dayKey()) || "0", 10) || 0; } catch (e) {}
       document.getElementById("t-stats").textContent =
-        "🔥 " + (st.current || 0) + " day streak · best " + (st.best || 0) + " · " + today + " blocks today · " + (g.xp || 0) + " xp";
+        " " + (st.current || 0) + " day streak · best " + (st.best || 0) + " · " + today + " blocks today · " + (g.xp || 0) + " xp";
     } catch (e) {
       document.getElementById("t-stats").textContent = "sessions save to your study log";
     }
@@ -301,7 +300,6 @@
       host.appendChild(el);
     });
   }
-  SK.ads.render();
 })();
 </script>
 </body>

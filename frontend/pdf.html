@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Notes — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
 <meta name="description" content="Read PDF notes with zoom and annotations." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
@@ -17,7 +19,9 @@
 <header class="site-header">
   <div class="nav-inner">
     <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <span class="nav-spacer"></span>
     <nav class="nav-links" aria-label="Primary"><a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a></nav>
+    <span class="nav-actions" id="auth-area"></span>
     <button class="btn btn-ghost btn-sm" id="back-btn">← Course</button>
   </div>
 </header>
@@ -42,7 +46,7 @@
     <button class="iconbtn" id="zoom-out" aria-label="Zoom out">−</button>
     <button class="qpill" id="zoom-fit">Fit</button>
     <button class="iconbtn" id="zoom-in" aria-label="Zoom in">+</button>
-    <button class="qpill" id="draw-toggle" aria-pressed="false" title="Draw on pages">✏️</button>
+    <button class="qpill" id="draw-toggle" aria-pressed="false" title="Draw on pages">Draw</button>
     <span id="draw-tools" style="display:none;gap:.35rem;align-items:center">
       <button class="qpill on" data-c="#111111" title="Black">●</button>
       <button class="qpill" data-c="#c81e1e" style="color:#c81e1e" title="Red">●</button>
@@ -66,7 +70,6 @@
     <div id="notes-list"></div>
   </section>
 
-  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 </div></main>
 
 <div id="toast-root" aria-live="polite"></div>
@@ -74,13 +77,12 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, api = SK.api, fb = SK.fb;
   var qp = function (k) { return new URLSearchParams(location.search).get(k); };
   var courseId = qp("course") || qp("courseId") || "", contentId = qp("content") || qp("contentId") || "", vdcId = qp("vdc_id") || "";
-  var user = null, pdfUrl = "", pdf = null, page = 1, scale = null;
+  var user = null, pdfUrl = "", pdf = null, page = 1, scale = null, lastPageSave = 0;
   /* Title comes from the grid link, else the cached list item, else the
      backend payload (PDF URLs carry the real filename). */
   var cachedItem = null;
@@ -98,13 +100,13 @@
   ui.boot({ status: "Opening notes…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
-    location.href = "content.html?id=" + courseId;
+    location.href = SK.ui.courseUrl("", courseId);
   });
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  fb.ensure().then(boot).catch(function () { fail("Sign-in service unreachable. Check connection and retry."); });
+  fb.ensure().then(function () { return boot(false); }).catch(function () { fail("Sign-in service unreachable. Check connection and retry."); });
   ui.load(true);
-  async function boot() {
+  async function boot(forceRefresh) {
     user = await fb.currentUser().catch(function () { return null; });
     if (!user) {
       var ok = await api.isFreePreview(courseId, contentId).catch(function () { return false; });
@@ -123,9 +125,13 @@
     var d;
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
-      d = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle);
+      d = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle, !!forceRefresh);
     }
-    catch (e) { fail(e.message || e); return; }
+    catch (e) {
+      var auth = e.status === 401 || /sign in|auth|session/i.test(String(e.message || ""));
+      fail(auth ? "Your session ended — sign in again to open this document." : (e.message || "The document link expired. Get a fresh link below."));
+      return;
+    }
     /* Only hand off to the video player when the source really is a video.
        A null file_type (videos come from /vc/{vdc_id}) must NOT bounce PDFs. */
     var looksVideo = /\.(m3u8|mp4|mpd|webm|m4v|mov)(\?|#|$)/i.test(d.file_url || "");
@@ -161,9 +167,19 @@
         pdf = await pdfjsLib.getDocument({ data: await resp.arrayBuffer() }).promise;
       }
       await renderAll();
-      if (user) fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: pdfTitle, type: "pdf", done: true }).catch(function () {});
+      if (user) {
+        fb.progress(user.uid, courseId).then(function (p) {
+          var w = (p && p.watched && p.watched[contentId]) || {};
+          var at = Math.min(pdf.numPages, Math.max(1, Number(w.page) || 1));
+          if (at > 1) {
+            page = at;
+            var el = document.getElementById("pdf-page-" + at);
+            if (el) setTimeout(function () { el.scrollIntoView({ block: "start" }); ui.toast("Resumed at page " + at, "", ""); }, 200);
+          }
+        }).catch(function () {});
+        fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: pdfTitle, type: "pdf", done: true }).catch(function () {});
+      }
       loadNotes();
-      SK.ads.render();
       ui.load(false);
     } catch (e) {
       fail("Could not render this document — tap Retry, or use Download.");
@@ -176,9 +192,15 @@
       stage.innerHTML = '<div class="empty" style="border:0"><h3>Couldn\'t open this file</h3>' +
         "<p>" + ui.esc(String(msg || "Document unavailable")) + "</p>" +
         '<div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">' +
-        '<button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'pdf-dl\').click()">Download</button>' +
+        '<button class="btn btn-primary btn-sm" id="pdf-fresh">Get fresh link</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="location.reload()">Reload</button>' +
         "</div></div>";
+      var f = document.getElementById("pdf-fresh");
+      if (f) f.addEventListener("click", function () {
+        stage.innerHTML = '<div class="spinner" role="status"></div>';
+        ui.load(true);
+        boot(true).catch(function () {}).then(function () { ui.load(false); });
+      });
     }
     ui.load(false);
   }
@@ -283,6 +305,10 @@
     page = p;
     var inp = document.getElementById("pg-input");
     if (inp && document.activeElement !== inp) inp.value = p;
+    if (user && Date.now() - lastPageSave > 12000) {
+      lastPageSave = Date.now();
+      fb.saveProgress(user.uid, courseId, contentId, { page: p, title: pdfTitle, type: "pdf" }).catch(function () {});
+    }
   }
   async function renderPage(p, attempt) {
     var holder = document.getElementById("pdf-page-" + p);

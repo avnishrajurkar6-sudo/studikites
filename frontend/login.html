@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Sign In — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
 <meta name="description" content="Sign in with Google or phone OTP." />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -85,7 +87,7 @@
   var next = qp("next") || "dashboard.html";
   var busy = false, mobile = "";
   fb.captureReferral();
-  fb.currentUser().then(function (u) { if (u) location.replace(next); }).catch(function () {});
+  fb.currentUser().then(function (u) { if (u) routeAfter(u.uid); }).catch(function () {});
 
   function alert(msg, ok) {
     var box = document.getElementById("authAlert");
@@ -105,12 +107,17 @@
       document.getElementById(id).hidden = (i + 1) !== n;
     });
   }
-  function routeAfter(uid) {
-    fb.banCheck(uid).then(function () { setTimeout(function () { location.replace(next); }, 500); })
-      .catch(function (e) {
-        if (String(e.message).indexOf("BANNED:") === 0) location.replace("banned.html");
-        else setTimeout(function () { location.replace(next); }, 500);
-      });
+  async function routeAfter(uid) {
+    try { await fb.banCheck(uid); }
+    catch (e) {
+      if (String(e.message).indexOf("BANNED:") === 0) { location.replace("banned.html"); return; }
+    }
+    /* First login -> onboarding. Returning user -> their requested page. */
+    var onboarded = await fb.prefs(uid, true).catch(function () { return null; });
+    var dest = onboarded === false
+      ? "onboarding.html?next=" + encodeURIComponent(next)
+      : next;
+    setTimeout(function () { location.replace(dest); }, 450);
   }
 
   async function doSend() {

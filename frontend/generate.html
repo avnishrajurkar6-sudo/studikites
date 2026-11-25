@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Key Manager — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -46,7 +48,7 @@
       <span class="chip">48h expiry</span>
     </div>
     <div style="display:flex;gap:.6rem;align-items:center;margin-top:.8rem;flex-wrap:wrap">
-      <button class="btn btn-primary" id="gen-btn">⚿ Generate Key</button>
+      <button class="btn btn-primary" id="gen-btn">Key Generate Key</button>
       <span class="mono muted" style="font-size:.68rem">Format SK-XXXX-XXXX · 1 device</span>
     </div>
     <div class="row-card" id="keyout" style="display:none;margin-top:.9rem">
@@ -89,7 +91,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
@@ -170,7 +171,7 @@
       ui.toast("Key generated", key + " — valid 48 hours");
       load();
     }).catch(function () { ui.toast("Generation failed", "Try again"); })
-      .then(function () { btn.disabled = false; btn.textContent = "⚿ Generate Key"; });
+      .then(function () { btn.disabled = false; btn.textContent = "Key Generate Key"; });
   });
   document.getElementById("copy-btn").addEventListener("click", function () {
     var t = document.getElementById("gen-key").textContent;

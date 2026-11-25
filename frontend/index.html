@@ -3,13 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>StudiKitEZ — Batches</title>
-<meta name="description" content="Browse batches. First lecture of every batch is free." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<title>StudiKitEZ — Learn something great today</title>
+<meta name="description" content="Curated batches, free first lectures, live classes and notes. Learn calmly with StudiKitEZ." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="theme-color" content="#ffffff" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .hero .search { max-width:36rem; }
+  .feature-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(13rem,1fr)); gap:.8rem; margin-top:1.4rem; }
+  .feature { display:flex; gap:.7rem; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.85rem 1rem; }
+  .feature b { font-size:.86rem; display:block; }
+  .feature span.muted { font-size:.74rem; }
+  .feature-mark { color:var(--muted); font:600 .68rem var(--mono); letter-spacing:.04em; }
+  .category .chip { cursor:pointer; }
+</style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -17,138 +27,176 @@
   <div class="nav-inner">
     <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="index.html" class="on">Catalog</a>
-      <a href="dashboard.html">Dashboard</a>
-      <a href="focus.html">Focus Rooms</a>
-      <a href="app.html">App</a>
+      <a href="index.html" class="on">Catalog</a><a href="dashboard.html">Dashboard</a>
+      <a href="posts.html">Community</a><a href="focus.html">Focus Rooms</a>
     </nav>
-    <span style="display:flex;align-items:center;gap:.5rem">
-      <span id="auth-area" style="display:flex;gap:.5rem"></span>
-      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
-    </span>
+    <span class="nav-spacer"></span>
+    <span class="nav-actions" id="auth-area"></span>
+    <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">Menu</button>
   </div>
   <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
-    <a href="index.html">Catalog</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="focus.html">Focus Rooms</a>
-    <a href="app.html">App</a>
+    <a href="index.html" class="on">Catalog</a><a href="dashboard.html">Dashboard</a>
+    <a href="posts.html">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
   </nav>
 </header>
 
 <main class="page" id="main"><div class="wrap">
-  <div class="page-head anim-rise">
-    <span class="kicker">Catalog · <span id="count">—</span> batches</span>
-    <h1>Find your batch</h1>
-    <p>Every batch opens with a free first lecture. Sign in to unlock the rest.</p>
-  </div>
+  <section class="hero anim-rise">
+    <span class="blob a"></span><span class="blob b"></span>
+    <div class="hero-split">
+      <div>
+        <span class="kicker">StudiKitEZ by AVkings</span>
+        <h1>Make every study session count.</h1>
+        <p>Explore curated courses, attend live classes, and keep your notes in one place. Preview the first lecture free.</p>
+        <div class="search" role="search"><input id="q" type="search" placeholder="Search courses, classes or exams" autocomplete="off" aria-label="Search courses" /><span class="hint">Ctrl K</span></div>
+        <div class="hero-actions" style="margin-top:1rem">
+          <button class="btn btn-primary" id="hero-start">Start learning</button>
+        </div>
+        <div class="hero-stats"><div><b id="n-batches">—</b><span>curated batches</span></div><div><b>1st</b><span>lecture always free</span></div><div><b>24×7</b><span>learn at your pace</span></div></div>
+      </div>
+      <div class="hero-card" id="hero-card" aria-hidden="true">
+        <img src="" alt="" id="hero-img" />
+        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.8rem"><span class="ava">A</span><div><b style="font-size:.84rem">AARAMBH 2.0</b><div class="muted" style="font-size:.7rem">Class 10th · 26–27</div></div><span class="badge-free" style="margin-left:auto">FREE</span></div>
+      </div>
+    </div>
+    <div class="feature-strip">
+      <div class="feature"><span class="feature-mark">01</span><div><b>Video lessons</b><span class="muted">Reliable playback and quality controls</span></div></div>
+      <div class="feature"><span class="feature-mark">02</span><div><b>Notes and PDFs</b><span class="muted">Keep course materials together</span></div></div>
+      <div class="feature"><span class="feature-mark">03</span><div><b>Learning progress</b><span class="muted">Pick up where you left off</span></div></div>
+      <div class="feature"><span class="feature-mark">04</span><div><b>Study together</b><span class="muted">Join the learner community</span></div></div>
+    </div>
+  </section>
 
-  <div class="search anim-rise" style="--d:.06s" role="search">
-    <span aria-hidden="true">⌕</span>
-    <input id="q" type="search" placeholder="Search batches…" autocomplete="off" aria-label="Search batches" />
-  </div>
-
-  <section id="announcements" style="margin-top:1.4rem;display:none" aria-label="Announcements">
-    <span class="kicker">Announcements</span>
+  <section id="announcements" style="margin-top:1.6rem;display:none" aria-label="Announcements">
+    <div class="section-title"><h2>Announcements</h2></div>
     <div class="ann-strip" id="ann-list"></div>
   </section>
 
-  <div class="cards" id="grid" style="margin-top:1.25rem" aria-live="polite"></div>
+  <div class="section-title reveal"><h2>Explore batches</h2><span id="count">—</span><span class="link" id="show-all">Show all →</span></div>
+  <div class="chip-row category reveal" id="chips" role="group" aria-label="Filter by category"></div>
+  <div class="cards" id="grid" style="margin-top:1rem" aria-live="polite"></div>
+  <div style="text-align:center;margin-top:1.3rem"><button class="btn btn-secondary" id="more" style="display:none">Show more batches</button></div>
 
-  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 </div></main>
 
-<footer class="site-footer"><div class="wrap">
-  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
-  <span style="display:flex;gap:1rem">
-    <a href="contact.html" style="font-size:.85rem">Contact</a>
-    <a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.85rem">Telegram</a>
-  </span>
-</div></footer>
-
+<footer class="site-footer"><div class="wrap"><span class="muted" style="font-size:.82rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span><span style="display:flex;gap:1rem"><a href="contact.html" style="font-size:.82rem">Contact</a><a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.82rem">Telegram</a></span></div></footer>
 <div id="toast-root" aria-live="polite"></div>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
-  var ui = SK.ui, grid = document.getElementById("grid"), q = document.getElementById("q"), all = [];
+  var ui = SK.ui, api = SK.api, fb = SK.fb;
+  var all = [], shown = 24, filter = "", query = "";
   ui.boot({ status: "Loading catalog…" }).catch(function () {});
-  ui.nav(); ui.telegram(); ui.telegramNag(); ui.authArea();
-  ui.announcePopup();
-  SK.fb.announcements(8).then(function (list) {
+  ui.nav(); ui.telegram(); ui.telegramNag(); ui.announcePopup();
+  ui.skeleton(document.getElementById("grid"), 6);
+
+  fb.announcements(6).then(function (list) {
     if (!list.length) return;
     var host = document.getElementById("ann-list");
     document.getElementById("announcements").style.display = "";
     list.forEach(function (a) {
       var el = document.createElement("div");
       el.className = "ann-item anim-rise";
-      el.innerHTML = '<span class="ico" aria-hidden="true">📢</span><div style="flex:1;min-width:0"><div style="font-weight:700"></div><div class="muted" style="font-size:.88rem;line-height:1.5;white-space:pre-wrap"></div></div>';
-      el.querySelector("div div").textContent = a.title;
-      el.querySelectorAll("div div")[1].textContent = a.body || "";
+      el.innerHTML = '<div style="min-width:0;flex:1"><div class="a-title" style="font-weight:700;font-size:.88rem"></div><div class="a-body muted" style="font-size:.82rem;white-space:pre-wrap"></div></div>';
+      el.querySelector(".a-title").textContent = a.title;
+      el.querySelector(".a-body").textContent = a.body || "";
       if (a.link) {
-        var b = document.createElement("a");
-        b.className = "btn btn-secondary btn-sm"; b.style.marginTop = ".6rem"; b.textContent = "Open →";
-        b.href = a.link;
+        var b = document.createElement("a"); b.className = "btn btn-secondary btn-sm"; b.textContent = "Open →"; b.href = a.link; b.style.marginTop = ".5rem";
         el.querySelector("div").appendChild(b);
       }
       host.appendChild(el);
     });
   }).catch(function () {});
-  function enrolled() { try { return JSON.parse(localStorage.getItem("sk_enrolled") || "[]"); } catch (e) { return []; } }
-  function render(filter) {
-    grid.innerHTML = "";
-    var s = String(filter || "").trim().toLowerCase();
-    var list = !s ? all : all.filter(function (b) {
-      return String(b.title || "").toLowerCase().indexOf(s) >= 0 || String(b.id).indexOf(s) >= 0;
+
+  var cats = [
+    { id: "", label: "All batches" },
+    { id: "class 12", label: "Class 12" }, { id: "class 11", label: "Class 11" },
+    { id: "class 10", label: "Class 10" }, { id: "class 9", label: "Class 9" },
+    { id: "cuet", label: "CUET" }, { id: "nirmaan", label: "NIRMAAN" },
+    { id: "free", label: "Free" }, { id: "2025-26", label: "2025–26" }
+  ];
+  document.getElementById("chips").innerHTML = cats.map(function (c) {
+    return '<button type="button" class="chip' + (c.id === "" ? " on" : "") + '" data-cat="' + ui.esc(c.id) + '">' + ui.esc(c.label) + "</button>";
+  }).join("");
+  document.querySelectorAll("#chips .chip").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#chips .chip").forEach(function (x) { x.classList.toggle("on", x === b); });
+      filter = b.dataset.cat; shown = 24; render();
     });
-    document.getElementById("count").textContent = list.length;
-    if (!list.length) {
-      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>No matches</h3><p>Try a different search.</p></div>';
-      return;
-    }
-    var en = enrolled();
-    list.forEach(function (b, i) {
-      var card = document.createElement("article");
-      card.className = "bcard anim-rise";
-      card.style.setProperty("--d", Math.min(i * 0.04, 0.4) + "s");
-      var isEn = en.indexOf(b.id) >= 0;
-      card.innerHTML = '<div class="thumb"><img loading="lazy" alt="" /></div>' +
-        '<div class="body"><div class="meta">BATCH ' + ui.esc(b.id) + (b.fresh ? ' · <span class="badge-new">NEW</span>' : "") + '</div>' +
-        "<h3></h3>" +
-        '<div style="display:flex;gap:.5rem;margin-top:auto">' +
-        '<button class="btn btn-secondary btn-sm" data-a="enroll" style="flex:1">' + (isEn ? "✓ Enrolled" : "+ Enroll") + "</button>" +
-        '<button class="btn btn-primary btn-sm" data-a="open" style="flex:1">Open →</button></div></div>';
-      var img = card.querySelector("img");
-      img.src = b.thumbnail; img.alt = b.title;
-      img.onerror = function () { img.style.display = "none"; };
-      card.querySelector("h3").textContent = b.title;
-      card.querySelector('[data-a="enroll"]').addEventListener("click", function () {
-        SK.fb.toggleEnroll(b.id); render(q.value);
-        ui.toast(isEn ? "Unenrolled" : "Enrolled ✓", b.title);
-      });
-      card.querySelector('[data-a="open"]').addEventListener("click", function () {
-        location.href = "content.html?id=" + encodeURIComponent(b.id);
-      });
-      grid.appendChild(card);
-    });
-  }
-  ui.skeleton(grid, 6);
+  });
+
   ui.load(true);
-  SK.api.allBatches().then(function (batches) {
+  api.allBatches().then(function (batches) {
+    all = batches;
+    document.getElementById("n-batches").textContent = all.length;
     var seen = [];
     try { seen = JSON.parse(localStorage.getItem("sk_seen_batches") || "[]"); } catch (e) {}
-    all = batches.map(function (b) { return { id: b.id, title: b.title, thumbnail: b.thumbnail, fresh: seen.indexOf(b.id) < 0 }; });
-    try { localStorage.setItem("sk_seen_batches", JSON.stringify(batches.map(function (b) { return b.id; }))); } catch (e) {}
-    render("");
+    all.forEach(function (b) { b.fresh = seen.indexOf(b.id) < 0; });
+    try { localStorage.setItem("sk_seen_batches", JSON.stringify(all.map(function (b) { return b.id; }))); } catch (e) {}
+    var hero = all[0];
+    if (hero) document.getElementById("hero-img").src = hero.thumbnail;
+    render();
     ui.load(false);
   }).catch(function () {
     ui.load(false);
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Catalog unavailable</h3><p>Check your connection and retry.</p></div>';
+    document.getElementById("grid").innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Catalog unavailable</h3><p>Check your connection and try again.</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
   });
-  q.addEventListener("input", function () { render(q.value); });
-  SK.ads.render();
+
+  function matches(b) {
+    var hay = (b.title + " " + b.id).toLowerCase();
+    if (query && hay.indexOf(query) < 0) return false;
+    if (!filter) return true;
+    return hay.indexOf(filter) >= 0;
+  }
+  function render() {
+    var grid = document.getElementById("grid"), list = all.filter(matches), en = fb.enrolled();
+    document.getElementById("count").textContent = list.length + " batches";
+    grid.innerHTML = "";
+    if (!list.length) {
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>No matches</h3><p>Try a different search or filter.</p></div>';
+      document.getElementById("more").style.display = "none";
+      return;
+    }
+    list.slice(0, shown).forEach(function (b, i) {
+      var card = document.createElement("article");
+      card.className = "bcard reveal";
+      card.style.setProperty("--d", Math.min(i * .035, .35) + "s");
+      var isEn = en.indexOf(b.id) >= 0;
+      card.innerHTML = '<div class="thumb"><span class="play-orb">▶</span><span class="ribbon"><span class="badge-free">FREE 1st</span>' + (b.fresh ? '<span class="badge-new">NEW</span>' : "") + '</span><img loading="lazy" alt="" /></div>' +
+        '<div class="body"><div class="meta">BATCH ' + ui.esc(b.id) + '</div><h3></h3>' +
+        '<div class="mono muted" style="font-size:.66rem">Video + PDF notes · live classes</div>' +
+        '<div style="display:flex;gap:.5rem;margin-top:auto;padding-top:.5rem"><button class="btn btn-secondary btn-sm" data-a="enroll" style="flex:1">' + (isEn ? "Saved" : "+ Save") + '</button><a class="btn btn-primary btn-sm" style="flex:1" href="' + ui.esc(ui.courseUrl(b.title, b.id)) + '">View course</a></div></div>';
+      var img = card.querySelector("img"); img.src = b.thumbnail; img.alt = b.title;
+      img.onerror = function () { img.style.visibility = "hidden"; };
+      card.querySelector("h3").textContent = b.title;
+      card.querySelector('[data-a="enroll"]').addEventListener("click", function () {
+        var now = fb.toggleEnroll(b.id);
+        ui.toast(now.indexOf(b.id) >= 0 ? "Saved" : "Removed", b.title);
+        render();
+      });
+      grid.appendChild(card);
+      if (window.__skRevealScan) window.__skRevealScan();
+    });
+    document.getElementById("more").style.display = list.length > shown ? "" : "none";
+  }
+  var typing;
+  document.getElementById("q").addEventListener("input", function () {
+    var v = this.value;
+    clearTimeout(typing);
+    typing = setTimeout(function () { query = v.trim().toLowerCase(); shown = 24; render(); }, 140);
+  });
+  document.getElementById("more").addEventListener("click", function () { shown += 24; render(); });
+  document.getElementById("show-all").addEventListener("click", function () { filter = ""; query = ""; shown = all.length; document.getElementById("q").value = ""; document.querySelectorAll("#chips .chip").forEach(function (x) { x.classList.toggle("on", x.dataset.cat === ""); }); render(); });
+  document.getElementById("hero-start").addEventListener("click", function () {
+    fb.currentUser().then(function (u) { location.href = u ? "dashboard.html" : "login.html"; })
+      .catch(function () { location.href = "login.html"; });
+  });
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.getElementById("q").focus(); }
+  });
 })();
 </script>
 </body>

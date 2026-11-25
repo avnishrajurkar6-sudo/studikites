@@ -48,7 +48,7 @@
 
     <section class="panel span-6 anim-rise" aria-label="Live now">
       <div class="row-head" style="justify-content:space-between">
-        <span class="kicker" style="margin:0">🟢 Live now <span id="presence-count" class="muted"></span></span>
+        <span class="kicker" style="margin:0"> Live now <span id="presence-count" class="muted"></span></span>
         <button class="btn btn-ghost btn-sm" id="presence-reload">Reload</button>
       </div>
       <div id="presence-list" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem"></div>
@@ -78,7 +78,7 @@
       <span class="kicker">Send announcement</span>
       <input class="input" id="ann-title" placeholder="Title — e.g. New batch added!" style="margin-bottom:.5rem;font-size:.85rem" />
       <textarea class="input" id="ann-body" rows="2" placeholder="Message…" style="margin-bottom:.5rem;font-size:.85rem"></textarea>
-      <input class="input" id="ann-link" placeholder="Link (optional) — e.g. content.html?id=105" style="margin-bottom:.6rem;font-size:.85rem" />
+      <input class="input" id="ann-link" placeholder="Link (optional) — e.g. /course/course-name" style="margin-bottom:.6rem;font-size:.85rem" />
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" id="ann-send">Publish to home</button>
         <button class="btn btn-ghost btn-sm" id="ann-cancel" style="display:none">Cancel edit</button>
@@ -169,7 +169,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;

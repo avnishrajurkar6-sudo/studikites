@@ -28,6 +28,17 @@ const server = http.createServer((req, res) => {
       return;
     }
     if (p === "/") p = "/index.html";
+    if (/^\/course\/[^/]+\/?$/.test(p)) p = "/content.html";
+    if (p === "/api/avkings") return sendLocal(req, res, 200, {
+      success: true, brand: "AVkings", engine: "AVkings Engine", version: "2.0.0", product: "StudiKitEZ",
+      tagline: "Learn calmly. Built by AVkings.", time: new Date().toISOString(),
+    });
+    if (p === "/api/courses/batches") {
+      try {
+        const catalog = JSON.parse(fs.readFileSync(path.join(ROOT, "batches.json"), "utf8"));
+        return sendLocal(req, res, 200, Object.assign({ success: true, source: "local", updatedAt: Date.now() }, catalog));
+      } catch (e) {}
+    }
     if (p === "/api" || p.startsWith("/api/")) return proxyApi(req, res, p);
     let file = path.normalize(path.join(ROOT, p));
     if (!file.startsWith(ROOT)) {
@@ -53,6 +64,17 @@ const server = http.createServer((req, res) => {
     res.end("server error");
   }
 });
+function sendLocal(req, res, status, obj) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*",
+    "X-Powered-By": "AVkings",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+  });
+  res.end(JSON.stringify(obj));
+}
 const PORT = Number(process.argv[2] || 8090);
 server.listen(PORT, "127.0.0.1", () => console.log(`StudiKitEZ v2 on http://localhost:${PORT}/ (api -> ${BACKEND})`));
 
@@ -68,7 +90,13 @@ function proxyApi(req, res, p) {
         hostname: target.hostname,
         path: target.pathname + target.search,
         method: req.method,
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        headers: Object.assign(
+          { Accept: "application/json", "Content-Type": "application/json" },
+          ["authorization", "x-sk-session", "x-sk-sitekey", "x-requested-with"].reduce(function (h, k) {
+            if (req.headers[k]) h[k] = req.headers[k];
+            return h;
+          }, {})
+        ),
       },
       (up) => {
         res.writeHead(up.statusCode, {

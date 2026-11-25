@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Get the App — StudiKitEZ</title>
 <meta name="description" content="Offline lectures, streaks and focus rooms in your pocket. Join the waitlist." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -80,11 +81,10 @@
     <div id="rel-list" style="margin-top:.8rem"></div>
   </section>
 
-  <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 </div></main>
 
 <footer class="site-footer"><div class="wrap">
-  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Learn calmly.</span>
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span>
   <span style="display:flex;gap:1rem">
     <a href="contact.html" style="font-size:.85rem">Contact</a>
     <a href="index.html" style="font-size:.85rem">All batches</a>
@@ -96,7 +96,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, fb = SK.fb;
@@ -116,7 +115,7 @@
     else prompt("Copy app link:", APP_URL);
   });
 
-  document.getElementById("wl-count").textContent = "new APK in progress — join to be first 🌱";
+  document.getElementById("wl-count").textContent = "new APK in progress — join to be first ";
 
   /* Latest version from Firestore `app` collection (admin publishes versions).
      APK live → waitlist hides. No APK → waitlist is the "coming soon" state. */
@@ -195,7 +194,6 @@
       ui.toast("Joined ✓", "See you at launch");
     } catch (e) { ui.toast("Couldn't join", "Try again when online"); }
   });
-  SK.ads.render();
 })();
 </script>
 </body>

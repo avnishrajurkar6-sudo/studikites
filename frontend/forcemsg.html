@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Message from Admin — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 <style>
   body.forced .site-header, body.forced .site-footer { pointer-events: none; opacity: .35; filter: grayscale(1); }
@@ -28,13 +30,14 @@
   <section class="panel anim-rise" id="force-card" style="margin-top:8vh;text-align:center" aria-live="assertive">
     <span class="kicker" style="border-color:var(--danger);color:var(--danger)">Admin message</span>
     <div class="ava admin" style="width:3rem;height:3rem;font-size:1.2rem;margin:.8rem auto .6rem">A</div>
-    <div class="mono muted" id="fm-from" style="font-size:.68rem;letter-spacing:.1em">ADMIN · STUDIO KITEZ</div>
+    <div class="mono muted" id="fm-from" style="font-size:.68rem;letter-spacing:.1em">AVKINGS · STUDIO TEAM</div>
+    <h2 id="fm-title" style="font-size:1.2rem;margin:.8rem 0 .3rem"></h2>
     <p id="fm-text" style="font-size:1.05rem;line-height:1.6;white-space:pre-wrap;margin:.9rem 0;min-height:3rem"></p>
     <div class="mono muted" id="fm-state" style="font-size:.7rem">Waiting for admin…</div>
     <div style="margin-top:1.2rem">
       <button class="btn btn-secondary" id="fm-leave" disabled>Leave page</button>
     </div>
-    <p class="mono muted" style="font-size:.62rem;margin-top:.9rem">This page stays until the admin lets you go, closes the message, or goes idle for 2 minutes.</p>
+    <p class="mono muted" style="font-size:.62rem;margin-top:.9rem">This notice stays until the admin removes it, its timer ends, or its view limit is reached.</p>
   </section>
 </div></main>
 
@@ -58,7 +61,8 @@
     fb.watchForce(u.uid, function (f) {
       if (!f) { release("The admin closed the message."); return; }
       document.getElementById("fm-text").textContent = f.text || "(empty message)";
-      document.getElementById("fm-from").textContent = (f.fromName || "ADMIN").toUpperCase() + " · STUDIO KITEZ";
+      document.getElementById("fm-title").textContent = f.title || "A message for you";
+      document.getElementById("fm-from").textContent = (f.fromName || "ADMIN").toUpperCase() + " · AVKINGS";
       var active = fb.forceActive(f);
       if (f.allowLeave === true) { release("The admin allowed you to leave."); return; }
       if (!active) { release("The admin stepped away — you can leave now."); return; }

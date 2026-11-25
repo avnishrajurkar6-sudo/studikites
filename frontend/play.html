@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#ffffff" />
 <title>Lecture — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
 <meta name="description" content="Watch the lecture distraction-free." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/main.css" />
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
@@ -22,7 +24,9 @@
 <header class="site-header">
   <div class="nav-inner">
     <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <span class="nav-spacer"></span>
     <nav class="nav-links" aria-label="Primary"><a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a><a href="focus.html">Focus Rooms</a></nav>
+    <span class="nav-actions" id="auth-area"></span>
     <button class="btn btn-ghost btn-sm" id="back-btn">← Course</button>
   </div>
 </header>
@@ -56,7 +60,6 @@
         <span id="quals" style="display:flex;gap:.4rem;flex-wrap:wrap"></span>
       </div>
 
-      <div class="ad-slot" data-ad="banner"><div class="ad-label">Advertisement</div></div>
 
       <section class="panel" style="margin-top:1rem">
         <h2 style="font-size:1rem">My notes</h2>
@@ -91,7 +94,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/firebase.js"></script>
 <script src="assets/js/ui.js"></script>
-<script src="assets/js/ads.js"></script>
 <script>
 (function () {
   var ui = SK.ui, api = SK.api, fb = SK.fb;
@@ -115,7 +117,7 @@
   ui.boot({ status: "Loading lecture…" }).catch(function () {});
   ui.nav(); ui.telegram(); ui.telegramNag();
   document.getElementById("back-btn").addEventListener("click", function () {
-    location.href = "content.html?id=" + courseId + (folderId && folderId !== "0" ? "&path=" + folderId : "");
+    location.href = SK.ui.courseUrl("", courseId, folderId && folderId !== "0" ? folderId : "");
   });
   function fmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
 
@@ -125,7 +127,7 @@
     ui.load(false);
     document.getElementById("stage").innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center"><h2>Backend unreachable</h2><p class="muted">Set the backend URL and check connection, then retry.</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div>';
   });
-  async function bootWithKey() {
+  async function bootWithKey(forceRefresh) {
     var key;
     try { key = await fb.mintKey(); }
     catch (e) {
@@ -148,12 +150,18 @@
     try {
       var headers = await fb.authHeaders().catch(function () { return {}; });
       var vdcId = qp("vdc_id") || "";
-      play = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle);
+      play = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle, !!forceRefresh);
       console.log("[PLAY] API result:", play);
       if (!play || !play.file_url) throw new Error(play && play.error ? play.error : "No video URL returned");
     } catch (e) {
       console.error("[PLAY] Failed:", e.message);
-      location.href = "maintenance.html?reason=" + encodeURIComponent(e.message || "playback_failed");
+      var reason = String(e.message || "Lecture source unavailable");
+      var authIssue = e.status === 401 || /sign in|auth|session/i.test(reason);
+      stageError(
+        authIssue ? "Sign in to continue" : "Lecture link expired",
+        authIssue ? "Your session ended. Sign in again and this lecture will resume." : reason,
+        authIssue ? "login.html?next=" + encodeURIComponent(location.pathname + location.search) : null
+      );
       return;
     }
     /* Video was requested but the source turned out to be a PDF — hand off. */
@@ -169,32 +177,44 @@
     SK.fb.presenceBeat(undefined, "watching · " + finalTitle);
     attach(play.file_url);
     loadUpNext(); loadNotes(); loadChat(); setInterval(loadChat, 8000);
-    SK.ads.render();
   }
 
-  /* Inline player error — never hijack the page once playback is possible. */
-  function playerError(msg) {
+  /* Inline player error — NEVER navigate away and never show a false failure
+     while the browser still has buffered video it can play. */
+  function stageError(title, msg, link) {
     var veil = document.getElementById("veil");
     if (veil) veil.classList.add("hide");
     var stage = document.getElementById("stage");
-    var box = document.getElementById("stage-error");
-    if (!box) {
-      box = document.createElement("div");
-      box.id = "stage-error";
-      box.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center;background:var(--surface);z-index:5";
-      stage.appendChild(box);
-    }
-    box.innerHTML = '<h2 style="margin:0">Stream hiccup</h2>' +
-      '<p class="muted" style="margin:0;max-width:32ch">' + ui.esc(msg || "The lecture stream stopped responding.") + "</p>" +
-      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">' +
-      '<button class="btn btn-primary btn-sm" id="stage-retry">Resume</button>' +
-      '<button class="btn btn-secondary btn-sm" id="stage-reload">Reload</button></div>';
-    document.getElementById("stage-retry").addEventListener("click", function () {
+    if (!stage) return;
+    var box = document.getElementById("stage-error") || document.createElement("div");
+    box.id = "stage-error";
+    box.className = "panel";
+    box.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;gap:.6rem;align-items:center;justify-content:center;padding:2rem;text-align:center;background:var(--surface);z-index:5;border:0;border-radius:0";
+    box.innerHTML = '<div style="font-size:2rem"></div><h2 style="margin:0">' + ui.esc(title) + "</h2>" +
+      '<p class="muted" style="margin:0;max-width:34ch">' + ui.esc(msg || "Please try again.") + "</p>" +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem">' +
+      (link ? '<a class="btn btn-primary btn-sm" href="' + ui.esc(link) + '">Sign in →</a>' :
+        '<button class="btn btn-primary btn-sm" id="stage-retry">Resume</button>') +
+      '<button class="btn btn-secondary btn-sm" id="stage-fresh">Get fresh link</button>' +
+      '<button class="btn btn-ghost btn-sm" id="stage-reload">Reload</button></div>';
+    if (!box.parentNode) stage.appendChild(box);
+    var retry = box.querySelector("#stage-retry");
+    if (retry) retry.addEventListener("click", function () {
       if (hls) { try { hls.startLoad(); } catch (e) {} }
       else if (play && play.file_url) { video.load(); video.play().catch(function () {}); }
       box.remove();
     });
-    document.getElementById("stage-reload").addEventListener("click", function () { location.reload(); });
+    box.querySelector("#stage-fresh").addEventListener("click", function () {
+      box.remove(); ui.load(true);
+      bootWithKey(true).catch(function () {}).then(function () { ui.load(false); });
+    });
+    box.querySelector("#stage-reload").addEventListener("click", function () { location.reload(); });
+  }
+  function playerError(msg) {
+    /* A fatal HLS segment 404 often means just one chunk expired. If we still
+       have playable buffered data, keep playing instead of blanking the page. */
+    if (video.readyState >= 3 && !video.ended && !video.paused) return;
+    stageError("Stream hiccup", msg || "The lecture stream stopped responding.", null);
   }
 
   function attach(url) {
@@ -289,10 +309,28 @@
     } catch (e) {}
     if (user && video.duration && Date.now() - (video._p || 0) > 15000) {
       video._p = Date.now();
-      fb.saveProgress(user.uid, courseId, contentId, { pct: Math.min(99, Math.round((video.currentTime / video.duration) * 100)), title: play.title, type: "video" }).catch(function () {});
+      fb.saveProgress(user.uid, courseId, contentId, {
+        pct: Math.min(99, Math.round((video.currentTime / video.duration) * 100)),
+        pos: Math.floor(video.currentTime), title: play.title, type: "video"
+      }).catch(function () {});
     }
   });
-  video.addEventListener("loadedmetadata", function () { document.getElementById("t-dur").textContent = fmt(video.duration); });
+  video.addEventListener("loadedmetadata", function () {
+    document.getElementById("t-dur").textContent = fmt(video.duration);
+    if (!user || !video.duration) return;
+    fb.progress(user.uid, courseId).then(function (p) {
+      var w = (p && p.watched && p.watched[contentId]) || {};
+      var at = Number(w.pos) || 0;
+      if (at > 5 && at < video.duration - 10) {
+        try { video.currentTime = at; ui.toast("Resumed where you left off", fmt(at), "Time"); } catch (e) {}
+      }
+    }).catch(function () {});
+  });
+  window.addEventListener("pagehide", function () {
+    if (user && video.currentTime > 3) {
+      fb.saveProgress(user.uid, courseId, contentId, { pos: Math.floor(video.currentTime), title: play && play.title, type: "video" }).catch(function () {});
+    }
+  });
   video.addEventListener("ended", function () {
     if (user) fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: play.title, type: "video", done: true }).catch(function () {});
     ui.toast("Lecture complete ✓", "+10 XP");
@@ -511,7 +549,7 @@
         SK.fb.presenceBeat(undefined, "watching · " + files[i].title);
       }
       var next = i >= 0 ? files.slice(i + 1, i + 4) : files.slice(0, 3);
-      host.innerHTML = next.length ? "" : '<p class="muted">End of this folder. 🎉</p>';
+      host.innerHTML = next.length ? "" : '<p class="muted">End of this folder. </p>';
       next.forEach(function (f) {
         var b = document.createElement("button");
         b.className = "btn btn-secondary btn-sm btn-block";
@@ -553,7 +591,7 @@
   async function loadChat() {
     var host = document.getElementById("chat-msgs");
     var list = await fb.listChat(courseId, contentId);
-    host.innerHTML = list.length ? "" : '<p class="muted" style="font-size:.85rem">No messages yet — say hi. 👋</p>';
+    host.innerHTML = list.length ? "" : '<p class="muted" style="font-size:.85rem">No messages yet — say hi. </p>';
     list.forEach(function (m) {
       var el = document.createElement("div");
       el.style.fontSize = ".85rem";
@@ -594,11 +632,11 @@
       '<h3 style="margin:.5rem 0 .35rem">How\'s this lecture?</h3>' +
       '<p class="muted" style="margin:0 0 .9rem;font-size:.88rem">10 minutes in — your rating shapes what we fix and film next.</p>' +
       '<div class="stars" id="fb-stars" role="radiogroup" aria-label="Rating out of 5">' +
-        '<button type="button" class="star" data-v="1" aria-label="1 star">★</button>' +
-        '<button type="button" class="star" data-v="2" aria-label="2 stars">★</button>' +
-        '<button type="button" class="star" data-v="3" aria-label="3 stars">★</button>' +
-        '<button type="button" class="star" data-v="4" aria-label="4 stars">★</button>' +
-        '<button type="button" class="star" data-v="5" aria-label="5 stars">★</button>' +
+        '<button type="button" class="star" data-v="1" aria-label="1 star">*</button>' +
+        '<button type="button" class="star" data-v="2" aria-label="2 stars">*</button>' +
+        '<button type="button" class="star" data-v="3" aria-label="3 stars">*</button>' +
+        '<button type="button" class="star" data-v="4" aria-label="4 stars">*</button>' +
+        '<button type="button" class="star" data-v="5" aria-label="5 stars">*</button>' +
       "</div>" +
       '<div class="mono muted" id="fb-hint" style="font-size:.65rem;margin-top:.3rem">tap the stars</div>' +
       '<textarea class="input" id="fb-improve" rows="2" maxlength="300" placeholder="What to improve?" style="margin-top:.8rem;font-size:.85rem"></textarea>' +
