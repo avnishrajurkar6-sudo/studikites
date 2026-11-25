@@ -6,6 +6,10 @@
   "crons": [
     { "path": "/api/courses/batches", "schedule": "0 3 * * *" }
   ],
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/avkings?__route=health" },
+    { "source": "/api/config", "destination": "/api/avkings?__route=config" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
