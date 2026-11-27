@@ -157,7 +157,7 @@ async function createLink(req) {
   const tokenId = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = Date.now() + 10 * 60 * 1000;
 
-  // FIX: pass fields directly, NOT { fields: ... } — firestore-admin expects the field map
+  // FIX: pass fields directly, NOT { fields: ... }
   await fsCreateDocument('telegram_link_tokens', tokenId, encodeFields({ uid, expiresAt, used: false }));
   return { success: true, token, expiresAt };
 }
@@ -203,7 +203,7 @@ async function verifyLink(body) {
 
   const now = Date.now();
 
-  // FIX: pass fields directly (not wrapped), correct arg order
+  // FIX: pass fields directly (not wrapped)
   await fsPatchDocument(
     'telegram_link_tokens',
     tokenId,
@@ -244,9 +244,27 @@ async function writeTelegramProfile(uid, telegramUserId, body) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return sendOptions(req, res);
-  if (!requireMethod(req, res, ['POST'])) return;
+  if (!requireMethod(req, res, ['GET', 'POST'])) return;
 
   try {
+    // ---- HEALTH CHECK (GET ?debug=1) ----
+    // This lets you confirm the function is deployed and modules load.
+    if (req.method === 'GET' && String((req.query && req.query.debug) || '') === '1') {
+      return sendJson(req, res, 200, {
+        success: true,
+        debug: true,
+        route: '/api/auth/telegram-link',
+        loaded: { http: !!http, verify: !!verify, firestore: !!firestore },
+        missing,
+        timestamp: Date.now(),
+      });
+    }
+
+    // Only POST is allowed for actual actions
+    if (req.method !== 'POST') {
+      return sendJson(req, res, 405, { success: false, error: 'Method not allowed' });
+    }
+
     const body = await readJsonBody(req);
     const action = String(body.action || '');
 
