@@ -1,8 +1,10 @@
 {
-  "name": "studikitez-backend",
+  "name": "studikitez",
   "private": true,
-  "version": "0.1.0",
-  "description": "StudiKitEZ API for OTP and course/media calls (Vercel serverless).",
+  "version": "2.0.0",
+  "description": "StudiKitEZ — curated batches, free lectures, live classes and community. API for OTP, media and Telegram (Vercel serverless).",
+  "author": "AVkings <avkings604@gmail.com>",
+  "license": "UNLICENSED",
   "engines": {
     "node": ">=18"
   }

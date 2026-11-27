@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#090909" />
+<title>Message from Admin — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  body.forced .site-header, body.forced .site-footer { pointer-events: none; opacity: .35; filter: grayscale(1); }
+  body.forced main { pointer-events: none; opacity: .25; filter: grayscale(1); }
+  #force-card { position: relative; z-index: 70; }
+</style>
+</head>
+<body class="forced">
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary"><span class="mono muted" style="font-size:.7rem;align-self:center">locked</span></nav>
+  </div>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:34rem">
+  <section class="panel anim-rise" id="force-card" style="margin-top:8vh;text-align:center" aria-live="assertive">
+    <span class="kicker" style="border-color:var(--danger);color:var(--danger)">Admin message</span>
+    <div class="ava admin" style="width:3rem;height:3rem;font-size:1.2rem;margin:.8rem auto .6rem">A</div>
+    <div class="mono muted" id="fm-from" style="font-size:.68rem;letter-spacing:.1em">AVKINGS · STUDIO TEAM</div>
+    <h2 id="fm-title" style="font-size:1.2rem;margin:.8rem 0 .3rem"></h2>
+    <p id="fm-text" style="font-size:1.05rem;line-height:1.6;white-space:pre-wrap;margin:.9rem 0;min-height:3rem"></p>
+    <div id="fm-poll" class="poll-wrap" style="display:none;text-align:left;margin:1rem 0"></div>
+    <div class="mono muted" id="fm-state" style="font-size:.7rem">Waiting for admin…</div>
+    <div style="margin-top:1.2rem">
+      <button class="btn btn-secondary" id="fm-leave" disabled>Leave page</button>
+    </div>
+    <p class="mono muted" style="font-size:.62rem;margin-top:.9rem">This notice stays active until an admin releases or removes it.</p>
+  </section>
+</div></main>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var user = null, released = false, backTo = null;
+  try { backTo = sessionStorage.getItem("sk_force_back") || "dashboard.html"; } catch (e) {}
+
+  ui.boot({ login: true, status: "Checking message…" }).catch(function () {});
+  ui.load(true);
+  fb.currentUser().then(function (u) {
+    if (!u) { location.href = "login.html?next=forcemsg.html"; throw new Error("login"); }
+    user = u;
+    ui.load(false);
+    fb.watchForce(u.uid, function (f) {
+      if (!f) { release("The admin closed the message."); return; }
+      document.getElementById("fm-text").textContent = f.text || "(empty message)";
+      document.getElementById("fm-title").textContent = f.title || "A message for you";
+      document.getElementById("fm-from").textContent = (f.fromName || "ADMIN").toUpperCase() + " · AVKINGS";
+      var active = fb.forceActive(f);
+      renderPoll(u.uid, f);
+      if (f.allowLeave === true) { release("The admin allowed you to leave."); return; }
+      if (!active) { release("The admin stepped away — you can leave now."); return; }
+      locked();
+    });
+  }).catch(function (e) {
+    ui.load(false);
+    if (String(e.message) !== "login") document.getElementById("fm-state").textContent = "Connection problem — retrying…";
+  });
+
+  var pollBusy = false;
+  async function renderPoll(uid, f) {
+    var host = document.getElementById("fm-poll");
+    var poll = fb.forcePollOf(f);
+    if (!poll || !poll.options.length) { host.style.display = "none"; host.innerHTML = ""; return; }
+    host.style.display = "grid";
+    host.innerHTML = '<div class="poll-meta">QUICK POLL</div>' +
+      '<div id="fm-poll-q" style="font-weight:800;font-size:.95rem"></div>' +
+      '<div id="fm-poll-opts" style="display:grid;gap:.4rem"></div>' +
+      '<div class="poll-meta" id="fm-poll-total">Loading results…</div>';
+    host.querySelector("#fm-poll-q").textContent = poll.question || "Your answer";
+    var optsHost = host.querySelector("#fm-poll-opts");
+    var totalEl = host.querySelector("#fm-poll-total");
+    if (poll.endsAt && Date.now() > poll.endsAt) totalEl.textContent = "This poll has closed.";
+    var res = await fb.forcePollResults(uid);
+    var total = res.total || 0;
+    totalEl.textContent = total + " answer" + (total === 1 ? "" : "s") + (res.mine ? " · you answered" : "");
+    poll.options.forEach(function (o) {
+      var n = (res.counts && res.counts[o.id]) || 0;
+      var pct = total ? Math.round(n / total * 100) : 0;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "poll-opt" + (res.mine === o.id ? " sel" : "");
+      b.innerHTML = '<span class="fill" style="width:' + pct + '%"></span><span class="lbl"><span></span><span>' + pct + '%</span></span>';
+      b.querySelector(".lbl span").textContent = o.text;
+      b.disabled = pollBusy || (poll.endsAt && Date.now() > poll.endsAt);
+      b.addEventListener("click", function () { vote(uid, f, o.id); });
+      optsHost.appendChild(b);
+    });
+  }
+  async function vote(uid, f, optionId) {
+    if (pollBusy) return;
+    pollBusy = true;
+    try {
+      await fb.voteForcePoll(uid, optionId);
+      ui.toast("Answer saved", "Thanks — the admin can see it");
+    } catch (e) {
+      ui.toast("Couldn't save", e.message === "signin" ? "Sign in required" : "Try again");
+    }
+    pollBusy = false;
+    renderPoll(uid, f);
+  }
+
+  function locked() {
+    released = false;
+    document.body.classList.add("forced");
+    document.getElementById("fm-leave").disabled = true;
+    document.getElementById("fm-state").textContent = "Admin is active — please wait.";
+  }
+  function release(reason) {
+    if (released) return;
+    released = true;
+    document.body.classList.remove("forced");
+    document.getElementById("fm-leave").disabled = false;
+    document.getElementById("fm-state").textContent = reason || "You can leave now.";
+    ui.toast("Released", reason || "You can leave now.");
+  }
+
+  document.getElementById("fm-leave").addEventListener("click", function () {
+    try { sessionStorage.removeItem("sk_force_back"); } catch (e) {}
+    location.href = backTo || "index.html";
+  });
+
+  /* If navigation is attempted while locked, re-bounce (SPA-level guard). */
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a") : null;
+    if (a && released) return;
+    if (a && !released) { e.preventDefault(); ui.toast("Please wait", "The admin must release you first."); }
+  }, true);
+  window.addEventListener("beforeunload", function (e) {
+    if (!released) { e.preventDefault(); e.returnValue = ""; }
+  });
+})();
+</script>
+</body>
+</html>

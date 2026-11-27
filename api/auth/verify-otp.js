@@ -1,4 +1,4 @@
-const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, readJsonBody, otpBase, fetchUpstream, validIndianMobile, asId, rateLimit } = require("../../lib/http");
 const { mintSession } = require("../../lib/verify");
 
 module.exports = async function handler(req, res) {
@@ -12,6 +12,8 @@ module.exports = async function handler(req, res) {
     if (!mobile) return sendJson(req, res, 400, { success: false, error: "Enter a valid 10-digit Indian mobile number" });
     if (!/^\d{4,8}$/.test(otp)) return sendJson(req, res, 400, { success: false, error: "Enter the OTP you received" });
     if (!deviceId) return sendJson(req, res, 400, { success: false, error: "Missing device id" });
+    if (!rateLimit(req, res, "otp-verify-ip", 15, 60_000)) return;
+    if (!rateLimit(req, res, "otp-verify-mobile:" + mobile, 8, 10 * 60_000)) return;
     const base = otpBase();
     const upstream = await fetchUpstream(`${base}/api/verify-otp`, {
       method: "POST",

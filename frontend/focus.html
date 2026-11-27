@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#090909" />
+<title>Focus Rooms — StudiKitEZ</title>
+<meta name="description" content="Pomodoro focus rooms: study together, stay accountable." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="focus.html" class="on">Focus Rooms</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="focus.html">Focus Rooms</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <div class="page-head">
+    <span class="kicker">Pomodoro · together</span>
+    <h1>Study together.</h1>
+    <p>25 minutes focus, 5 minutes rest. No video, no audio — just quiet accountability.</p>
+  </div>
+
+  <div class="bento">
+    <section class="panel span-8 anim-rise" style="text-align:center" aria-label="Pomodoro timer">
+      <div class="seg" id="mode-seg" role="tablist" aria-label="Session length">
+        <button data-m="25" class="on">25 / 5</button>
+        <button data-m="50">50 / 10</button>
+        <button data-m="90">90 / 15</button>
+      </div>
+      <div class="timer-wrap">
+        <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="bg" cx="100" cy="100" r="90" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0" />
+          <circle class="fg" id="ring-fg" cx="100" cy="100" r="90" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0" />
+        </svg>
+        <div class="timer-digits mono" id="digits" role="timer" aria-live="off">25:00</div>
+      </div>
+      <div class="mono muted" id="phase" style="font-size:.72rem;letter-spacing:.14em">READY · FOCUS NEXT</div>
+      <div class="mono muted" id="sess-dots" style="font-size:.72rem;margin-top:.35rem;letter-spacing:.2em" aria-label="Sessions completed today"></div>
+      <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn btn-primary" id="t-start">Start</button>
+        <button class="btn btn-secondary" id="t-reset">Reset</button>
+        <button class="btn btn-ghost" id="t-sound" aria-pressed="false">Sound: off</button>
+      </div>
+      <div class="mono muted" style="font-size:.68rem;margin-top:.8rem" id="t-stats">sign in to track sessions</div>
+    </section>
+
+    <section class="panel span-4 anim-rise" style="--d:.05s" aria-label="Room members">
+      <span class="kicker">In this room <span class="live-dot"></span></span>
+      <div class="avatar-stack" id="avatars" style="margin:.4rem 0 .6rem"></div>
+      <div class="mono muted" id="member-line" style="font-size:.72rem">— studying</div>
+      <div style="display:flex;gap:.5rem;margin-top:1rem">
+        <input class="input mono" id="room-name" value="room-1" aria-label="Room name" style="font-size:.85rem" />
+        <button class="btn btn-secondary btn-sm" id="room-join">Join</button>
+      </div>
+      <p class="mono muted" style="font-size:.65rem;margin:.6rem 0 0">Sign-in required to appear · heartbeat every 20s</p>
+    </section>
+
+    <section class="panel span-5 anim-rise" style="--d:.08s" aria-label="Room chat">
+      <span class="kicker">Room chat · live</span>
+      <div id="room-msgs" style="max-height:18rem;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem" aria-live="polite"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.6rem">
+        <input class="input" id="room-input" placeholder="Message the room…" maxlength="300" aria-label="Room message" />
+        <button class="btn btn-primary btn-sm" id="room-send" aria-label="Send message">➤</button>
+      </div>
+      <p class="mono muted" id="room-chat-note" style="font-size:.65rem;display:none;margin:.5rem 0 0">chat unavailable — check connection</p>
+    </section>
+
+    <section class="panel span-7 anim-rise" style="--d:.1s" aria-label="All rooms">
+      <span class="kicker">All rooms</span>
+      <div id="rooms" class="cards"></div>
+    </section>
+  </div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span>
+  <a href="dashboard.html" style="font-size:.85rem">Dashboard</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  ui.boot({ login: true, status: "Joining focus…" }).catch(function () {});
+  ui.nav(); ui.telegram(); ui.telegramNag();
+  var user = null;
+  ui.load(true);
+  fb.requireLogin("focus.html").then(function (u) {
+    user = u; ui.authArea(); stats();
+    joinRoom(); listRooms();
+    ui.load(false);
+  }).catch(function () { ui.load(false); });
+  var BREAKS = { 25: 5, 50: 10, 90: 15 };
+  var focusMin = 25, breakMin = 5, remaining = 25 * 60, running = false, onBreak = false, tick = null, sound = false;
+
+  document.querySelectorAll("#mode-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#mode-seg button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      focusMin = Number(b.dataset.m); breakMin = BREAKS[focusMin];
+      onBreak = false; remaining = focusMin * 60; running = false;
+      clearInterval(tick); paint();
+      document.getElementById("t-start").textContent = "Start";
+    });
+  });
+  function paint() {
+    var m = String(Math.floor(remaining / 60)).padStart(2, "0"), s = String(remaining % 60).padStart(2, "0");
+    document.getElementById("digits").textContent = m + ":" + s;
+    var total = (onBreak ? breakMin : focusMin) * 60;
+    var ring = document.getElementById("ring-fg");
+    if (ring && total > 0) ring.style.strokeDashoffset = String(Math.min(100, Math.max(0, (1 - remaining / total) * 100)));
+    document.getElementById("phase").textContent = running ? (onBreak ? "BREAK · REST YOUR EYES" : "FOCUS · STAY WITH IT") : "READY · FOCUS NEXT";
+    document.title = m + ":" + s + (onBreak ? " · break" : " · focus") + " — StudiKitEZ";
+  }
+  function sessKey() { return "sk_focus_done_" + new Date().toISOString().slice(0, 10); }
+  function renderDots() {
+    var host = document.getElementById("sess-dots");
+    if (!host) return;
+    var n = 0;
+    try { n = parseInt(localStorage.getItem(sessKey()) || "0", 10) || 0; } catch (e) {}
+    var dots = "", i;
+    for (i = 0; i < Math.min(n, 8); i++) dots += "●";
+    for (i = dots.length; i < Math.min(Math.max(n, 4), 8); i++) dots += "○";
+    host.textContent = (dots ? dots + "   " : "") + n + " session" + (n === 1 ? "" : "s") + " today";
+  }
+  renderDots();
+  function beep() {
+    if (!sound) return;
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = onBreak ? 520 : 880; g.gain.value = 0.07;
+      o.start(); o.stop(ctx.currentTime + 0.4);
+    } catch (e) {}
+  }
+  document.getElementById("t-sound").addEventListener("click", function () {
+    sound = !sound;
+    this.textContent = "Sound: " + (sound ? "on" : "off");
+    this.setAttribute("aria-pressed", sound ? "true" : "false");
+  });
+  document.getElementById("t-reset").addEventListener("click", function () {
+    running = false; clearInterval(tick);
+    remaining = (onBreak ? breakMin : focusMin) * 60;
+    document.getElementById("t-start").textContent = "Start"; paint();
+  });
+  document.getElementById("t-start").addEventListener("click", function () {
+    running = !running;
+    this.textContent = running ? "Pause" : "Resume";
+    clearInterval(tick);
+    if (!running) { paint(); return; }
+    tick = setInterval(function () {
+      remaining--;
+      if (remaining <= 0) {
+        beep();
+        if (!onBreak) {
+          fb.studyLog(focusMin);
+          try {
+            var k = "sk_activity_" + fb.dayKey();
+            localStorage.setItem(k, String(Math.min(999, (parseInt(localStorage.getItem(k) || "0", 10) || 0) + focusMin)));
+            localStorage.setItem(sessKey(), String((parseInt(localStorage.getItem(sessKey()) || "0", 10) || 0) + 1));
+          } catch (e) {}
+          renderDots();
+          ui.toast("Focus block done ✓", focusMin + " min logged — take " + breakMin + " off");
+          stats();
+        } else { ui.toast("Break over", "Back to focus "); stats(); }
+        onBreak = !onBreak;
+        remaining = (onBreak ? breakMin : focusMin) * 60;
+      }
+      paint();
+    }, 1000);
+    paint();
+  });
+  async function stats() {
+    if (!user) return;
+    try {
+      var g = await fb.gamification(user.uid);
+      var st = g.streak || {};
+      var today = 0;
+      try { today = parseInt(localStorage.getItem("sk_focus_done_" + fb.dayKey()) || "0", 10) || 0; } catch (e) {}
+      document.getElementById("t-stats").textContent =
+        " " + (st.current || 0) + " day streak · best " + (st.best || 0) + " · " + today + " blocks today · " + (g.xp || 0) + " xp";
+    } catch (e) {
+      document.getElementById("t-stats").textContent = "sessions save to your study log";
+    }
+  }
+  paint();
+
+  var roomId = "room-1";
+  async function joinRoom() {
+    roomId = (document.getElementById("room-name").value.trim() || "room-1").slice(0, 40);
+    subChat();
+    if (!user) { ui.toast("Sign in required", "Rooms need an account"); renderRoster([]); return; }
+    try {
+      await fb.focusJoin(roomId);
+      ui.toast("Joined ✓", roomId);
+      pollRoster();
+    } catch (e) { ui.toast("Join failed", ""); }
+  }
+  document.getElementById("room-join").addEventListener("click", joinRoom);
+  var chatOff = null;
+  function subChat() {
+    try { if (chatOff) chatOff(); } catch (e) {}
+    chatOff = null;
+    var host = document.getElementById("room-msgs");
+    host.innerHTML = "";
+    var note = document.getElementById("room-chat-note");
+    note.style.display = "none";
+    var spin = document.createElement("div");
+    spin.className = "spinner"; spin.style.margin = "1rem auto";
+    spin.setAttribute("role", "status");
+    host.appendChild(spin);
+    chatOff = fb.watchRoomChat(roomId, function (m) {
+      if (!document.body.contains(host)) return;
+      if (!m) { spin.remove(); note.style.display = ""; return; }
+      if (spin.parentNode) spin.remove();
+      var mine = !!(user && m.uid && m.uid === user.uid);
+      var isAdminMsg = m.authorRole === "admin";
+      var el = document.createElement("div");
+      el.className = "anim-rise";
+      if (mine) {
+        el.style.textAlign = "right";
+        el.innerHTML = '<span style="display:inline-block;background:var(--ink);color:var(--bg);border-radius:12px 12px 4px 12px;padding:.4rem .7rem;max-width:88%;font-size:.85rem"></span>';
+        el.querySelector("span").textContent = m.text || "";
+        if (isAdminMsg) el.querySelector("span").style.boxShadow = "0 0 0 1px var(--primary)";
+      } else {
+        el.innerHTML = '<div class="mono muted" style="font-size:.62rem;margin-bottom:.15rem"></div><span style="display:inline-block;background:var(--surface-2);border:1px solid var(--line);border-radius:12px 12px 12px 4px;padding:.4rem .7rem;max-width:88%;font-size:.85rem"></span>';
+        el.querySelector("div").textContent = isAdminMsg ? "Admin" : (m.name || "learner");
+        if (isAdminMsg) el.querySelector("div").style.color = "var(--primary)";
+        el.querySelector("span").textContent = m.text || "";
+      }
+      host.appendChild(el);
+      while (host.children.length > 60) host.removeChild(host.firstChild);
+      host.scrollTop = host.scrollHeight;
+    });
+  }
+  async function sendRoomMsg() {
+    var input = document.getElementById("room-input"), t = input.value.trim();
+    if (!t) return;
+    try {
+      await fb.sendRoomChat(roomId, t);
+      input.value = "";
+    } catch (e) { ui.toast("Couldn't send", e.message === "signin" ? "Sign in required" : "Chat unavailable right now"); }
+  }
+  document.getElementById("room-send").addEventListener("click", sendRoomMsg);
+  document.getElementById("room-input").addEventListener("keydown", function (e) { if (e.key === "Enter") sendRoomMsg(); });
+  function renderRoster(members) {
+    var av = document.getElementById("avatars"); av.innerHTML = "";
+    members.slice(0, 12).forEach(function (m) {
+      var s = document.createElement("span");
+      s.textContent = String(m.name || "?").charAt(0).toUpperCase();
+      s.title = m.name || "";
+      av.appendChild(s);
+    });
+    document.getElementById("member-line").textContent = members.length ? members.length + " studying now" : "empty — you could be first";
+  }
+  async function pollRoster() {
+    renderRoster(await fb.focusRoster(roomId));
+    setTimeout(function () { if (document.body.contains(document.getElementById("avatars"))) pollRoster(); }, 15000);
+  }
+  async function listRooms() {
+    var host = document.getElementById("rooms");
+    if (!user) { host.innerHTML = '<p class="muted">Sign in to see rooms.</p>'; return; }
+    var rooms = await fb.focusRooms();
+    host.innerHTML = rooms.length ? "" : '<p class="muted">No rooms yet — join "' + ui.esc(roomId) + '" to create it.</p>';
+    rooms.forEach(function (r) {
+      var m = r.members || {}, now = Date.now();
+      var n = Object.keys(m).filter(function (k) { return now - ((m[k] || {}).at || 0) < 90000; }).length;
+      var el = document.createElement("button");
+      el.className = "panel anim-rise"; el.style.textAlign = "left"; el.style.marginTop = "0";
+      el.innerHTML = '<div style="font-weight:700"></div><div class="mono muted" style="font-size:.7rem;margin-top:.2rem">' + n + " in room</div>";
+      el.firstChild.textContent = r.name || r.id;
+      el.addEventListener("click", function () { document.getElementById("room-name").value = r.id || r.name; joinRoom(); });
+      host.appendChild(el);
+    });
+  }
+})();
+</script>
+</body>
+</html>

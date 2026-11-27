@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#090909" />
+<title>Notes — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
+<meta name="description" content="Read PDF notes with zoom and annotations." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <span class="nav-spacer"></span>
+    <nav class="nav-links" aria-label="Primary"><a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a></nav>
+    <span class="nav-actions" id="auth-area"></span>
+    <button class="btn btn-ghost btn-sm" id="back-btn">← Course</button>
+  </div>
+</header>
+
+<main class="page" id="main"><div class="wrap wide">
+  <span class="kicker">PDF notes</span>
+  <h1 id="doc-title" style="font-size:clamp(1.2rem,3vw,1.6rem)">Loading…</h1>
+
+  <div style="display:flex;gap:.5rem;margin:1rem 0;flex-wrap:wrap">
+    <button class="btn btn-secondary btn-sm" id="pdf-open">Open ↗</button>
+    <button class="btn btn-secondary btn-sm" id="pdf-dl">Download</button>
+    <span style="flex:1"></span>
+    <span class="mono muted" style="font-size:.75rem;align-self:center" id="pdf-meta">— pages</span>
+  </div>
+
+  <div class="ctl pdf-bar" id="pdf-bar">
+    <button class="iconbtn" id="pg-prev" aria-label="Previous page">‹</button>
+    <input class="input mono" id="pg-input" value="1" inputmode="numeric" style="width:4rem;text-align:center" aria-label="Page number" />
+    <span class="mono muted" style="font-size:.75rem">/ <span id="pg-total">—</span></span>
+    <button class="iconbtn" id="pg-next" aria-label="Next page">›</button>
+    <span style="flex:1"></span>
+    <button class="iconbtn" id="zoom-out" aria-label="Zoom out">−</button>
+    <button class="qpill" id="zoom-fit">Fit</button>
+    <button class="iconbtn" id="zoom-in" aria-label="Zoom in">+</button>
+    <button class="qpill" id="draw-toggle" aria-pressed="false" title="Draw on pages">Draw</button>
+    <span id="draw-tools" style="display:none;gap:.35rem;align-items:center">
+      <button class="qpill on" data-c="#111111" title="Black">●</button>
+      <button class="qpill" data-c="#c81e1e" style="color:#c81e1e" title="Red">●</button>
+      <button class="qpill" data-c="#1d4ed8" style="color:#1d4ed8" title="Blue">●</button>
+      <button class="qpill on" data-w="4" title="Medium">M</button>
+      <button class="qpill" data-w="7" title="Thick">B</button>
+      <button class="qpill" id="draw-undo" title="Undo stroke">↩</button>
+      <button class="qpill" id="draw-clear" title="Erase this page">⌫</button>
+    </span>
+  </div>
+  <div class="mono muted" id="draw-hint" style="font-size:.65rem;display:none;margin:.3rem 0 0">draw mode — annotations save on this device only</div>
+
+  <div class="pdf-stage reading" id="pdf-stage" aria-label="Document pages"><div class="spinner" role="status"></div></div>
+
+  <section class="panel" style="margin-top:1rem">
+    <h2 style="font-size:1rem">Page notes</h2>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem">
+      <input class="input" id="note-input" placeholder="Note for this page…" maxlength="500" aria-label="Add a note" />
+      <button class="btn btn-secondary" id="note-save">Save</button>
+    </div>
+    <div id="notes-list"></div>
+  </section>
+
+</div></main>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, api = SK.api, fb = SK.fb;
+  var qp = function (k) { return new URLSearchParams(location.search).get(k) || ""; };
+  var savedCtx = null;
+  try { savedCtx = JSON.parse(sessionStorage.getItem("sk_pdf_ctx") || "null"); } catch (e) { savedCtx = null; }
+  var courseId = qp("course") || qp("courseId") || (savedCtx && savedCtx.courseId) || "";
+  var contentId = qp("content") || qp("contentId") || (savedCtx && savedCtx.contentId) || "";
+  var vdcId = qp("vdc_id") || (savedCtx && savedCtx.vdcId) || "";
+  var user = null, pdfUrl = "", pdf = null, page = 1, scale = null, lastPageSave = 0;
+  /* Title comes from the grid link, else the cached list item, else the
+     backend payload (PDF URLs carry the real filename). */
+  var cachedItem = null;
+  try { cachedItem = JSON.parse(sessionStorage.getItem("player_" + courseId + "_" + contentId) || "null"); } catch (e) { cachedItem = null; }
+  var hintedTitle = String(qp("title") || (savedCtx && savedCtx.title) || (cachedItem && cachedItem.title) || "").trim();
+  function saveCtx() {
+    try {
+      sessionStorage.setItem("sk_pdf_ctx", JSON.stringify({
+        courseId: courseId, contentId: contentId, vdcId: vdcId, title: hintedTitle
+      }));
+    } catch (e) {}
+  }
+  function cleanUrl() {
+    try {
+      var u = new URL(location.href);
+      ["course", "courseId", "content", "contentId", "vdc_id"].forEach(function (k) { u.searchParams.delete(k); });
+      if (hintedTitle) u.searchParams.set("title", hintedTitle);
+      if (u.searchParams.toString() !== new URLSearchParams(location.search).toString()) {
+        history.replaceState(null, "", u.pathname + u.search);
+      }
+    } catch (e) {}
+  }
+  if (courseId && contentId) saveCtx();
+  var pdfTitle = hintedTitle || "Document";
+  function setDocTitle(t) {
+    var name = String(t || "").trim();
+    if (!name) return;
+    pdfTitle = name;
+    document.getElementById("doc-title").textContent = name;
+    document.title = "StudiKitEZ — " + name;
+  }
+  if (hintedTitle) setDocTitle(hintedTitle);
+  ui.boot({ status: "Opening notes…" }).catch(function () {});
+  ui.nav(); ui.telegram(); ui.telegramNag();
+  document.getElementById("back-btn").addEventListener("click", function () {
+    location.href = SK.ui.courseUrl("", courseId);
+  });
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  fb.ensure().then(function () { return boot(false); }).catch(function () { fail("Sign-in service unreachable. Check connection and retry."); });
+  ui.load(true);
+  async function boot(forceRefresh) {
+    user = await fb.currentUser().catch(function () { return null; });
+    if (!user) {
+      var ok = await api.isFreePreview(courseId, contentId).catch(function () { return false; });
+      if (!ok) {
+        ui.toast("Sign in required", "First document is free — sign in for the rest");
+        var selfNext = "pdf.html?course=" + courseId + "&content=" + contentId +
+          (vdcId ? "&vdc_id=" + encodeURIComponent(vdcId) : "") +
+          (hintedTitle ? "&title=" + encodeURIComponent(hintedTitle) : "");
+        setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent(selfNext); }, 800);
+        return;
+      }
+    }
+    var key;
+    try { key = await fb.mintKey(); }
+    catch (e) { fail("Playback keys need the backend + Firebase."); return; }
+    var d;
+    try {
+      var headers = await fb.authHeaders().catch(function () { return {}; });
+      d = await api.play(courseId, contentId, key.key, key.deviceId, headers, vdcId, hintedTitle, !!forceRefresh);
+    }
+    catch (e) {
+      var auth = e.status === 401 || /sign in|auth|session/i.test(String(e.message || ""));
+      fail(auth ? "Your session ended — sign in again to open this document." : (e.message || "The document link expired. Get a fresh link below."));
+      return;
+    }
+    /* Only hand off to the video player when the source really is a video.
+       A null file_type (videos come from /vc/{vdc_id}) must NOT bounce PDFs. */
+    var looksVideo = /\.(m3u8|mp4|mpd|webm|m4v|mov)(\?|#|$)/i.test(d.file_url || "");
+    if (Number(d.file_type) === 2 || (looksVideo && Number(d.file_type) !== 1)) {
+      location.replace("play.html?course=" + courseId + "&content=" + contentId +
+        (vdcId ? "&vdc_id=" + encodeURIComponent(vdcId) : "") +
+        "&title=" + encodeURIComponent(d.title || hintedTitle || ""));
+      return;
+    }
+    hintedTitle = String(d.title || hintedTitle || "Document");
+    setDocTitle(hintedTitle);
+    saveCtx(); cleanUrl();
+    pdfUrl = d.file_url;
+    if (typeof SK.fb.presenceBeat === "function") SK.fb.presenceBeat(undefined, "reading · " + pdfTitle);
+    try {
+      /* CMaps + standard fonts: required for Devanagari/CJK text PDFs, and
+         the reason some notes rendered as blank white pages. */
+      var docOpts = {
+        url: pdfUrl,
+        withCredentials: false,
+        cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
+        cMapPacked: true,
+        standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/",
+        wasmUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/wasm/",
+        useSystemFonts: true,
+        disableAutoFetch: true
+      };
+      try {
+        pdf = await pdfjsLib.getDocument(docOpts).promise;
+      } catch (first) {
+        /* Range/CORS/worker failures: pull the bytes once and parse locally. */
+        console.warn("[PDF] direct load failed, retrying as buffer:", first && first.message);
+        var resp = await fetch(pdfUrl);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        pdf = await pdfjsLib.getDocument({ data: await resp.arrayBuffer() }).promise;
+      }
+      await renderAll();
+      if (user) {
+        fb.progress(user.uid, courseId).then(function (p) {
+          var w = (p && p.watched && p.watched[contentId]) || {};
+          var at = Math.min(pdf.numPages, Math.max(1, Number(w.page) || 1));
+          if (at > 1) {
+            page = at;
+            var el = document.getElementById("pdf-page-" + at);
+            if (el) setTimeout(function () { el.scrollIntoView({ block: "start" }); ui.toast("Resumed at page " + at, "", ""); }, 200);
+          }
+        }).catch(function () {});
+        fb.saveProgress(user.uid, courseId, contentId, { pct: 100, title: pdfTitle, type: "pdf", done: true }).catch(function () {});
+      }
+      loadNotes();
+      ui.load(false);
+    } catch (e) {
+      fail("Could not render this document — tap Retry, or use Download.");
+    }
+  }
+  function fail(msg) {
+    console.error("[PDF] Failed:", msg);
+    var stage = document.getElementById("pdf-stage");
+    if (stage) {
+      stage.innerHTML = '<div class="empty" style="border:0"><h3>Couldn\'t open this file</h3>' +
+        "<p>" + ui.esc(String(msg || "Document unavailable")) + "</p>" +
+        '<div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">' +
+        '<button class="btn btn-primary btn-sm" id="pdf-fresh">Get fresh link</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="location.reload()">Reload</button>' +
+        "</div></div>";
+      var f = document.getElementById("pdf-fresh");
+      if (f) f.addEventListener("click", function () {
+        stage.innerHTML = '<div class="spinner" role="status"></div>';
+        ui.load(true);
+        boot(true).catch(function () {}).then(function () { ui.load(false); });
+      });
+    }
+    ui.load(false);
+  }
+  document.getElementById("pdf-open").addEventListener("click", function () { if (pdfUrl) window.open(pdfUrl, "_blank", "noopener"); });
+  document.getElementById("pdf-dl").addEventListener("click", async function () {
+    if (!pdfUrl) return;
+    var btn = this, old = btn.textContent;
+    btn.disabled = true; btn.textContent = "Preparing…";
+    try {
+      var c = new AbortController();
+      var timer = setTimeout(function () { c.abort(); }, 60000);
+      var res = await fetch(pdfUrl, { signal: c.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var blob = await res.blob();
+      var obj = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = obj; a.download = String(pdfTitle || "notes").replace(/[\\/:*?"<>|]/g, "").slice(0, 80) + ".pdf";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(obj); }, 5000);
+      btn.textContent = "Saved ✓";
+    } catch (e) {
+      var a2 = document.createElement("a");
+      a2.href = pdfUrl; a2.target = "_blank"; a2.rel = "noopener"; a2.download = pdfTitle + ".pdf";
+      document.body.appendChild(a2); a2.click(); a2.remove();
+      ui.toast("Direct link opened", "Site download blocked by the file host");
+    }
+    btn.disabled = false;
+    setTimeout(function () { btn.textContent = old; }, 2500);
+  });
+
+  /* Per-page PDF: lazy render (only visible pages), free zoom per view,
+     and a draw layer per page saved to THIS device's localStorage. */
+  var rendered = {}, pageDims = {}, drawData = {}, drawOn = false, drawColor = "#111111", drawW = 4;
+  var drawKey = "sk_pdf_draw_" + courseId + "_" + contentId;
+  try { drawData = JSON.parse(localStorage.getItem(drawKey) || "{}") || {}; } catch (e) { drawData = {}; }
+  function saveDraw() {
+    try { localStorage.setItem(drawKey, JSON.stringify(drawData)); } catch (e) {
+      try {
+        var keys = Object.keys(drawData);
+        while (keys.length > 2) { delete drawData[keys.shift()]; }
+        localStorage.setItem(drawKey, JSON.stringify(drawData));
+        ui.toast("Storage full", "Kept drawings for recent pages only");
+      } catch (e2) {}
+    }
+  }
+  function fitScale(pg, stageW) {
+    var v0 = pg.getViewport({ scale: 1 });
+    return Math.max(0.5, Math.min(2.5, (stageW - 40) / v0.width));
+  }
+  async function renderAll() {
+    var stage = document.getElementById("pdf-stage");
+    stage.innerHTML = "";
+    rendered = {}; pageDims = {};
+    document.getElementById("pg-total").textContent = pdf.numPages;
+    document.getElementById("pdf-meta").textContent = pdf.numPages + " pages · " + Math.round(scale === null ? 100 : scale * 100) + "%";
+    for (var p = 1; p <= pdf.numPages; p++) {
+      var holder = document.createElement("div");
+      holder.className = "pdf-holder"; holder.id = "pdf-page-" + p;
+      holder.dataset.page = p;
+      var cv = document.createElement("canvas"); cv.className = "pdf-page"; holder.appendChild(cv);
+      var ov = document.createElement("canvas"); ov.className = "draw-layer"; holder.appendChild(ov);
+      var sk = document.createElement("div");
+      sk.className = "skel"; sk.style.cssText = "position:absolute;inset:0;border-radius:6px;min-height:12rem;display:grid;place-items:center";
+      var skl = document.createElement("span");
+      skl.className = "mono muted"; skl.style.cssText = "font-size:.68rem;letter-spacing:.04em";
+      skl.textContent = "Loading page " + p + "…";
+      sk.appendChild(skl);
+      holder.appendChild(sk);
+      stage.appendChild(holder);
+      bindDraw(ov, p);
+      (function (pgNum, el) {
+        pdf.getPage(pgNum).then(function (pg) {
+          var v0 = pg.getViewport({ scale: 1 });
+          pageDims[pgNum] = { w: v0.width, h: v0.height };
+          el.style.aspectRatio = v0.width + " / " + v0.height;
+          io.observe(el);
+        }).catch(function () {
+          el.innerHTML = '<div class="empty" style="border:0"><p>Page ' + pgNum + " wouldn't render.</p></div>";
+        });
+      })(p, holder);
+    }
+    document.getElementById("pg-input").value = page;
+    /* First pages render NOW (never blank), rest lazy-load on scroll. Never
+       let a huge scan block the whole viewer from becoming usable. */
+    await Promise.race([
+      renderPage(1),
+      new Promise(function (resolve) { setTimeout(resolve, 10000); })
+    ]);
+    if (pdf.numPages >= 2) renderPage(2);
+    if (pdf.numPages >= 3) renderPage(3);
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var p = Number(en.target.dataset.page);
+      if (rendered[p]) { trackPage(p); return; }
+      renderPage(p);
+    });
+  }, { rootMargin: "600px 0px" });
+  function trackPage(p) {
+    page = p;
+    var inp = document.getElementById("pg-input");
+    if (inp && document.activeElement !== inp) inp.value = p;
+    if (user && Date.now() - lastPageSave > 12000) {
+      lastPageSave = Date.now();
+      fb.saveProgress(user.uid, courseId, contentId, { page: p, title: pdfTitle, type: "pdf" }).catch(function () {});
+    }
+  }
+  async function renderPage(p, attempt) {
+    var holder = document.getElementById("pdf-page-" + p);
+    if (!holder || rendered[p] === scale) return;
+    var stageW = document.getElementById("pdf-stage").clientWidth;
+    if (!stageW && (attempt || 0) < 4) {
+      setTimeout(function () { renderPage(p, (attempt || 0) + 1); }, 300);
+      return;
+    }
+    rendered[p] = scale;
+    try {
+      var pg = await pdf.getPage(p);
+      var s = scale === null ? fitScale(pg, stageW || 700) : scale;
+      var vp = pg.getViewport({ scale: s });
+      /* Scanned notes decode one huge image per page; dpr 1.5 is plenty and
+         materially faster than 2 on low-end laptops. */
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      var cv = holder.querySelector("canvas.pdf-page");
+      cv.width = Math.round(vp.width * dpr); cv.height = Math.round(vp.height * dpr);
+      cv.style.width = "100%"; cv.style.height = "auto";
+      holder.style.aspectRatio = vp.width + " / " + vp.height;
+      var task = pg.render({ canvasContext: cv.getContext("2d"), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined });
+      /* A 40 MB scan can sit on a range request forever; never leave the
+         skeleton shimmering over a page that will not arrive. */
+      await Promise.race([
+        task.promise,
+        new Promise(function (_, reject) { setTimeout(function () { reject(new Error("render timeout")); }, 25000); })
+      ]);
+      var sk = holder.querySelector(".skel");
+      if (sk) sk.remove();
+      paintDraw(p);
+      trackPage(p);
+    } catch (e) {
+      rendered[p] = null;
+      var skel = holder.querySelector(".skel");
+      if (skel) skel.remove();
+      if (!holder.querySelector(".empty")) {
+        var err = document.createElement("div");
+        err.className = "empty"; err.style.border = "0";
+        err.innerHTML = '<p>Page ' + p + ' is taking too long. <button class="btn btn-secondary btn-sm" data-retry="' + p + '">Retry page</button></p>';
+        holder.appendChild(err);
+        var rb = err.querySelector("[data-retry]");
+        if (rb) rb.addEventListener("click", function () { err.remove(); renderPage(p); });
+      }
+    }
+  }
+  function rerenderVisible() {
+    Object.keys(rendered).forEach(function (k) { rendered[k] = null; });
+    document.querySelectorAll(".pdf-holder").forEach(function (h) {
+      var r = h.getBoundingClientRect();
+      if (r.bottom > -400 && r.top < window.innerHeight + 400) renderPage(Number(h.dataset.page));
+    });
+  }
+  /* ---- draw layer: strokes stored as fractions (zoom-independent) ---- */
+  function paintDraw(p) {
+    var holder = document.getElementById("pdf-page-" + p);
+    if (!holder) return;
+    var ov = holder.querySelector("canvas.draw-layer");
+    var base = holder.querySelector("canvas.pdf-page");
+    var W = base.clientWidth || holder.clientWidth || 300, H = base.clientHeight || W;
+    ov.width = Math.max(1, Math.round(W)); ov.height = Math.max(1, Math.round(H));
+    var ctx = ov.getContext("2d");
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    (drawData[p] || []).forEach(function (st) {
+      if (!st.pts || st.pts.length < 2) return;
+      ctx.strokeStyle = st.c || "#111111"; ctx.lineWidth = Math.max(1, (st.w || 4) * (ov.width / 800));
+      ctx.beginPath();
+      ctx.moveTo(st.pts[0][0] * ov.width, st.pts[0][1] * ov.height);
+      for (var i = 1; i < st.pts.length; i++) ctx.lineTo(st.pts[i][0] * ov.width, st.pts[i][1] * ov.height);
+      ctx.stroke();
+    });
+    ov.classList.toggle("drawing", drawOn);
+  }
+  /* ---- draw engine v2: live smooth strokes, undo, zoom-proof ---- */
+  function smoothStroke(ctx, pts, W, H) {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * W, pts[0][1] * H);
+    if (pts.length === 2) { ctx.lineTo(pts[1][0] * W, pts[1][1] * H); ctx.stroke(); return; }
+    for (var i = 1; i < pts.length - 1; i++) {
+      var xc = (pts[i][0] + pts[i + 1][0]) / 2 * W, yc = (pts[i][1] + pts[i + 1][1]) / 2 * H;
+      ctx.quadraticCurveTo(pts[i][0] * W, pts[i][1] * H, xc, yc);
+    }
+    var last = pts[pts.length - 1];
+    ctx.lineTo(last[0] * W, last[1] * H);
+    ctx.stroke();
+  }
+  function paintDraw(p) {
+    var holder = document.getElementById("pdf-page-" + p);
+    if (!holder) return;
+    var ov = holder.querySelector("canvas.draw-layer");
+    var base = holder.querySelector("canvas.pdf-page");
+    var W = base.clientWidth || holder.clientWidth || 0, H = base.clientHeight || 0;
+    if (W < 10 || H < 10) return;
+    if (ov.width !== Math.round(W) || ov.height !== Math.round(H)) {
+      ov.width = Math.round(W); ov.height = Math.round(H);
+    }
+    var ctx = ov.getContext("2d");
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    (drawData[p] || []).forEach(function (st) {
+      if (!st.pts || st.pts.length < 2) return;
+      ctx.strokeStyle = st.c || "#111111";
+      ctx.lineWidth = Math.max(1.2, (st.w || 4) * (ov.width / 800));
+      smoothStroke(ctx, st.pts, ov.width, ov.height);
+    });
+    ov.classList.toggle("drawing", drawOn);
+  }
+  function bindDraw(ov, p) {
+    if (ov._bound) return; ov._bound = true;
+    var stroke = null, ctx = ov.getContext("2d");
+    function pos(e) {
+      var r = ov.getBoundingClientRect();
+      var cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+      var cy = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+      return [Math.min(1, Math.max(0, (cx - r.left) / r.width)), Math.min(1, Math.max(0, (cy - r.top) / r.height))];
+    }
+    function setup() {
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = stroke.c;
+      ctx.lineWidth = Math.max(1.2, stroke.w * (ov.width / 800));
+    }
+    function start(e) {
+      if (!drawOn) return;
+      e.preventDefault();
+      if (!ov.width) paintDraw(p);
+      stroke = { c: drawColor, w: drawW, pts: [pos(e)] };
+      setup();
+    }
+    function move(e) {
+      if (!stroke) return;
+      e.preventDefault();
+      var pt = pos(e), prev = stroke.pts[stroke.pts.length - 1];
+      var dx = (pt[0] - prev[0]) * ov.width, dy = (pt[1] - prev[1]) * ov.height;
+      if (dx * dx + dy * dy < 4) return;
+      /* live segment */
+      ctx.strokeStyle = stroke.c;
+      ctx.lineWidth = Math.max(1.2, stroke.w * (ov.width / 800));
+      ctx.beginPath();
+      ctx.moveTo(prev[0] * ov.width, prev[1] * ov.height);
+      ctx.lineTo(pt[0] * ov.width, pt[1] * ov.height);
+      ctx.stroke();
+      stroke.pts.push(pt);
+    }
+    function end() {
+      if (!stroke) return;
+      if (stroke.pts.length > 1) {
+        if (!drawData[p]) drawData[p] = [];
+        drawData[p].push({ c: stroke.c, w: stroke.w, pts: stroke.pts });
+        saveDraw();
+        paintDraw(p);
+      }
+      stroke = null;
+    }
+    ov.addEventListener("mousedown", start);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+    ov.addEventListener("mouseleave", function () { if (stroke && stroke.pts.length < 2) stroke = null; });
+    ov.addEventListener("touchstart", start, { passive: false });
+    ov.addEventListener("touchmove", move, { passive: false });
+    ov.addEventListener("touchend", end);
+  }
+  document.getElementById("draw-toggle").addEventListener("click", function () {
+    drawOn = !drawOn;
+    this.classList.toggle("on", drawOn);
+    this.setAttribute("aria-pressed", drawOn ? "true" : "false");
+    document.getElementById("draw-tools").style.display = drawOn ? "flex" : "none";
+    document.getElementById("draw-hint").style.display = drawOn ? "" : "none";
+    document.querySelectorAll("canvas.draw-layer").forEach(function (ov) { ov.classList.toggle("drawing", drawOn); });
+    ui.toast(drawOn ? "Draw mode on" : "Draw mode off", drawOn ? "Drag on any page to annotate" : "");
+  });
+  document.querySelectorAll("#draw-tools [data-c]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      drawColor = b.dataset.c;
+      document.querySelectorAll("#draw-tools [data-c]").forEach(function (x) { x.classList.toggle("on", x === b); });
+    });
+  });
+  document.querySelectorAll("#draw-tools [data-w]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      drawW = Number(b.dataset.w);
+      document.querySelectorAll("#draw-tools [data-w]").forEach(function (x) { x.classList.toggle("on", x === b); });
+    });
+  });
+  document.getElementById("draw-undo").addEventListener("click", function () {
+    var arr = drawData[page];
+    if (arr && arr.length) { arr.pop(); saveDraw(); paintDraw(page); }
+    else ui.toast("Nothing to undo", "");
+  });
+  document.getElementById("draw-clear").addEventListener("click", function () {
+    delete drawData[page];
+    saveDraw(); paintDraw(page);
+    ui.toast("Page cleared", "Drawings on page " + page + " erased");
+  });
+  window.addEventListener("resize", function () {
+    clearTimeout(window._pdfRs);
+    window._pdfRs = setTimeout(function () {
+      document.querySelectorAll(".pdf-holder").forEach(function (h) { paintDraw(Number(h.dataset.page)); });
+    }, 250);
+  });
+  function go(d) {
+    page = Math.min(Math.max(1, page + d), pdf ? pdf.numPages : 1);
+    document.getElementById("pg-input").value = page;
+    var el = document.getElementById("pdf-page-" + page);
+    if (el) el.scrollIntoView();
+  }
+  document.getElementById("pg-prev").addEventListener("click", function () { go(-1); });
+  document.getElementById("pg-next").addEventListener("click", function () { go(1); });
+  document.getElementById("pg-input").addEventListener("change", function (e) {
+    var n = parseInt(e.target.value, 10);
+    if (!isNaN(n) && pdf) { page = Math.min(Math.max(1, n), pdf.numPages); }
+    document.getElementById("pg-input").value = page;
+    var el = document.getElementById("pdf-page-" + page);
+    if (el) el.scrollIntoView();
+  });
+  document.getElementById("zoom-in").addEventListener("click", function () { scale = Math.min(3, (scale === null ? 1 : scale) + 0.2); rerenderVisible(); ui.toast("Zoom " + Math.round(scale * 100) + "%", ""); });
+  document.getElementById("zoom-out").addEventListener("click", function () { scale = Math.max(0.5, (scale === null ? 1 : scale) - 0.2); rerenderVisible(); ui.toast("Zoom " + Math.round(scale * 100) + "%", ""); });
+  document.getElementById("zoom-fit").addEventListener("click", function () { scale = null; rerenderVisible(); });
+  document.addEventListener("keydown", function (e) {
+    if (/INPUT|TEXTAREA/.test(e.target.tagName) || !pdf) return;
+    if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1);
+  });
+
+  async function loadNotes() {
+    var host = document.getElementById("notes-list");
+    var notes = await fb.listNotes(courseId, contentId);
+    host.innerHTML = notes.length ? "" : '<p class="muted" style="font-size:.85rem;margin-top:.5rem">No notes yet.</p>';
+    notes.forEach(function (n) {
+      var el = document.createElement("div");
+      el.className = "note-row";
+      el.innerHTML = '<span class="mono" style="font-size:.65rem;color:var(--primary-dark)"></span><div></div>';
+      el.querySelector("span").textContent = n.at || "";
+      el.querySelector("div").textContent = n.note || "";
+      host.appendChild(el);
+    });
+  }
+  document.getElementById("note-save").addEventListener("click", async function () {
+    var t = document.getElementById("note-input").value.trim();
+    if (!t) return;
+    if (!user) { ui.toast("Sign in required", ""); return; }
+    try {
+      await fb.saveNote(courseId, contentId, "p" + page, t);
+      document.getElementById("note-input").value = "";
+      loadNotes(); ui.toast("Saved ✓", "");
+    } catch (e) { ui.toast("Save failed", ""); }
+  });
+})();
+</script>
+</body>
+</html>

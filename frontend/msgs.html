@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#090909" />
+<title>Messages — StudiKitEZ</title>
+<meta name="description" content="Chat with the community, message other learners and talk directly to the admin team." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .msg-page { padding-top: .8rem; }
+  .side-label { font: 700 .66rem var(--font); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 1rem 0 .35rem; display: block; }
+  .side-label:first-child { margin-top: 0; }
+  .chat-head { display: flex; align-items: center; gap: .6rem; padding-bottom: .6rem; border-bottom: 1px solid var(--line); }
+  .chat-head .conv-ava { width: 2.4rem; height: 2.4rem; }
+  .chat-head b { font-size: .95rem; display: block; }
+  .chat-head span { font-size: .72rem; color: var(--muted); }
+  .notice-mini { border: 1px solid var(--line); border-radius: 12px; padding: .55rem .65rem; background: var(--surface); }
+  .notice-mini + .notice-mini { margin-top: .4rem; }
+  .notice-mini b { font-size: .78rem; display: block; }
+  .notice-mini p { font-size: .75rem; color: var(--muted); margin: .15rem 0; }
+  .support-box { border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--line)); border-radius: 14px; padding: .7rem; background: var(--primary-softer); }
+  @media (max-width: 899px) { .msg-side { position: static; max-height: none; } .chat-scroll { max-height: 60vh; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a>
+      <a href="posts.html">Community</a><a href="msgs.html" class="on">Messages</a><a href="focus.html">Focus Rooms</a>
+    </nav>
+    <span class="nav-spacer"></span>
+    <span class="nav-actions" id="auth-area"></span>
+    <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">Menu</button>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a>
+    <a href="posts.html">Community</a><a href="msgs.html" class="on">Messages</a><a href="focus.html">Focus Rooms</a>
+  </nav>
+</header>
+
+<main class="page msg-page" id="main"><div class="wrap">
+  <div class="page-head anim-rise" style="margin-bottom:.8rem">
+    <span class="kicker">Inbox · community · support</span>
+    <h1>Messages</h1>
+  </div>
+
+  <div class="msg-layout" id="msg-layout">
+    <aside class="panel msg-side anim-rise" aria-label="Conversations">
+      <div class="search" style="margin-bottom:.4rem"><span aria-hidden="true">⌕</span><input id="user-q" placeholder="Find a learner…" maxlength="60" aria-label="Search learners" style="font-size:.85rem" /></div>
+      <div id="user-results"></div>
+
+      <span class="side-label">Rooms</span>
+      <div id="room-list"></div>
+
+      <span class="side-label">Direct</span>
+      <div id="thread-list"><div class="muted" style="font-size:.75rem;padding:.3rem">Loading…</div></div>
+
+      <div id="support-admin" style="display:none">
+        <span class="side-label">Support inbox</span>
+        <div id="support-list"></div>
+      </div>
+
+      <span class="side-label">Notifications</span>
+      <div id="inbox-list"></div>
+
+      <div class="support-box" style="margin-top:1rem">
+        <b style="font-size:.8rem">Need a hand?</b>
+        <p class="muted" style="font-size:.73rem;margin:.2rem 0 .45rem">Message the admin team directly. We usually reply within a day.</p>
+        <button class="btn btn-secondary btn-sm btn-block" id="open-support">Chat with admin</button>
+      </div>
+    </aside>
+
+    <section class="panel chat-panel anim-rise" style="--d:.05s" aria-label="Conversation">
+      <div class="chat-head">
+        <button class="btn btn-secondary btn-sm chat-back" id="chat-back" aria-label="Back to conversations">Back</button>
+        <div class="conv-ava" id="chat-ava">C</div>
+        <div style="flex:1;min-width:0"><b id="chat-title">Community room</b><span id="chat-sub">Everyone can talk here</span></div>
+        <span class="post-badge" id="chat-badge" style="display:none">Admin</span>
+      </div>
+      <div class="chat-scroll" id="msgs" aria-live="polite"></div>
+      <div class="chat-compose">
+        <input class="input" id="msg-input" placeholder="Message…" maxlength="1000" aria-label="Message" autocomplete="off" />
+        <button class="btn btn-primary" id="msg-send" aria-label="Send message">➤</button>
+      </div>
+      <p class="muted" style="font-size:.68rem;margin:.35rem 0 0" id="chat-hint">Be kind. Messages are visible to everyone in this room.</p>
+    </section>
+  </div>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.82rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span>
+  <a href="dashboard.html" style="font-size:.82rem">Dashboard</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var user = null, isAdmin = false, thread = "community", off = null, threads = [];
+
+  ui.boot({ login: true, status: "Opening messages…" }).catch(function () {});
+  ui.load(true);
+  fb.requireLogin("msgs.html").then(function (u) {
+    user = u;
+    ui.nav(); ui.telegramNag(); ui.authArea();
+    document.getElementById("user-q").placeholder = "Find a learner…";
+    return fb.isAdmin(u.uid).catch(function () { return false; });
+  }).then(function (admin) {
+    isAdmin = !!admin;
+    ui.load(false);
+    openThread("community");
+    loadThreads();
+    fb.watchInbox(user.uid, renderInbox);
+    document.getElementById("support-admin").style.display = isAdmin ? "block" : "none";
+    if (isAdmin) loadSupportInbox();
+  }).catch(function () { ui.load(false); });
+
+  function timeAgo(ms) {
+    if (!ms) return "";
+    var s = Math.floor((Date.now() - ms) / 1000);
+    if (s < 60) return "now";
+    if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    return Math.floor(s / 86400) + "d";
+  }
+  function initials(name) {
+    var s = String(name || "?").replace(/^\+91\s*/, "").trim();
+    return s ? s.charAt(0).toUpperCase() : "?";
+  }
+  function labelFor(id) {
+    if (id === "community") return "Community room";
+    if (id.indexOf("support__") === 0) return isAdmin ? "Support · " + id.slice(9).replace(/^phone_/, "+91 ") : "Admin support";
+    var other = String(id).split("__").filter(function (x) { return x && x !== user.uid; })[0] || id;
+    return other.replace(/^phone_/, "+91 ");
+  }
+
+  document.getElementById("room-list").innerHTML =
+    '<button class="conv-item on" data-thread="community"><span class="conv-ava">C</span><span class="conv-txt"><b>Community room</b><span>Everyone can talk here</span></span><span class="conv-time">live</span></button>' +
+    '<button class="conv-item" data-thread="support"><span class="conv-ava admin">A</span><span class="conv-txt"><b>Admin support</b><span>Private chat with the team</span></span></button>';
+
+  document.querySelectorAll("[data-thread]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var id = b.getAttribute("data-thread");
+      if (id === "support") openThread(fb.supportThreadId(user.uid), "Admin support");
+      else openThread(id);
+    });
+  });
+  document.getElementById("open-support").addEventListener("click", function () {
+    openThread(fb.supportThreadId(user.uid), "Admin support");
+  });
+  document.getElementById("chat-back").addEventListener("click", function () {
+    document.getElementById("msg-layout").classList.remove("chat-open");
+    if (off) { try { off(); } catch (e) {} off = null; }
+  });
+
+  function openThread(id, label) {
+    thread = id;
+    document.getElementById("msg-layout").classList.add("chat-open");
+    var host = document.getElementById("msgs");
+    host.innerHTML = '<div class="spinner" style="margin:auto"></div>';
+    var isSupport = id.indexOf("support__") === 0;
+    var title = label || labelFor(id);
+    document.getElementById("chat-title").textContent = title;
+    document.getElementById("chat-sub").textContent = id === "community" ? "Everyone can talk here" : (isSupport ? "Private · only you and the admin team" : "Direct message");
+    document.getElementById("chat-ava").textContent = isSupport ? "A" : initials(title);
+    document.getElementById("chat-ava").className = "conv-ava" + (isSupport ? " admin" : "");
+    document.getElementById("chat-hint").textContent = isSupport
+      ? "Private support chat. Share screenshots or describe the issue."
+      : (id === "community" ? "Be kind. Messages are visible to everyone in this room." : "Direct message — only the two of you can read it.");
+    document.getElementById("chat-badge").style.display = isSupport ? "inline-flex" : "none";
+    document.querySelectorAll("[data-thread]").forEach(function (b) {
+      var bid = b.getAttribute("data-thread");
+      b.classList.toggle("on", bid === id || (bid === "support" && isSupport));
+    });
+    if (off) { try { off(); } catch (e) {} off = null; }
+    off = fb.watchThread(id, function (m) {
+      if (!m) { host.innerHTML = '<div class="muted" style="font-size:.8rem;margin:auto">Chat is unavailable right now.</div>'; return; }
+      var sp = host.querySelector(".spinner"); if (sp) sp.remove();
+      var mine = m.from === user.uid;
+      var adminMsg = m.authorRole === "admin";
+      var row = document.createElement("div");
+      row.className = "bubble-row" + (mine ? " mine" : "") + (adminMsg ? " admin" : "");
+      row.innerHTML = '<div class="bubble"><span class="who"></span><span class="txt"></span></div>';
+      row.querySelector(".who").textContent = mine ? (adminMsg ? "Admin (you)" : "You") : (adminMsg ? "Admin" : (m.name || "learner"));
+      row.querySelector(".txt").textContent = m.text || "";
+      host.appendChild(row);
+      while (host.children.length > 160) host.removeChild(host.firstChild);
+      host.scrollTop = host.scrollHeight;
+    });
+  }
+
+  function send() {
+    var input = document.getElementById("msg-input"), t = input.value.trim();
+    if (!t || !user) return;
+    input.value = "";
+    var p = thread.indexOf("support__") === 0 ? fb.sendSupport(t) : fb.sendMsg(thread, t);
+    p.catch(function (e) {
+      input.value = t;
+      ui.toast("Couldn't send", e.message === "signin" ? "Sign in required" : "Try again");
+    });
+  }
+  document.getElementById("msg-send").addEventListener("click", send);
+  document.getElementById("msg-input").addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
+  window.addEventListener("pagehide", function () { if (off) off(); });
+
+  function convButton(id, name, last, at, extra) {
+    var b = document.createElement("button");
+    b.className = "conv-item";
+    b.setAttribute("data-thread", id);
+    var admin = id.indexOf("support__") === 0;
+    b.innerHTML = '<span class="conv-ava' + (admin ? " admin" : "") + '"></span><span class="conv-txt"><b></b><span></span></span><span class="conv-time"></span>';
+    b.querySelector(".conv-ava").textContent = admin ? "A" : initials(name || labelFor(id));
+    b.querySelector(".conv-txt b").textContent = name || labelFor(id);
+    b.querySelector(".conv-txt span").textContent = last || extra || "Start the conversation";
+    b.querySelector(".conv-time").textContent = timeAgo(at || 0);
+    b.addEventListener("click", function () { openThread(id, name); });
+    return b;
+  }
+
+  function loadThreads() {
+    var host = document.getElementById("thread-list");
+    fb.myThreads().then(function (list) {
+      host.innerHTML = "";
+      threads = (list || []).filter(function (t) { return t.id && t.id !== "community" && String(t.id).indexOf("support__") !== 0; });
+      if (!threads.length) { host.innerHTML = '<div class="muted" style="font-size:.75rem;padding:.2rem .3rem">No direct messages yet. Search someone above.</div>'; return; }
+      threads.forEach(function (t) {
+        var other = String(t.id).split("__").filter(function (x) { return x && x !== user.uid; })[0] || "";
+        var name = t.lastRole === "admin" ? "Admin" : other.replace(/^phone_/, "+91 ");
+        host.appendChild(convButton(t.id, name, t.lastText, t.lastAt));
+      });
+    }).catch(function () { host.innerHTML = '<div class="muted" style="font-size:.75rem">Could not load chats.</div>'; });
+  }
+
+  async function loadSupportInbox() {
+    var host = document.getElementById("support-list");
+    var rows = await fb.supportThreads(30).catch(function () { return []; });
+    host.innerHTML = rows.length ? "" : '<div class="muted" style="font-size:.74rem;padding:.2rem .3rem">No support messages.</div>';
+    rows.forEach(function (t) {
+      var who = String(t.uid || t.id.slice(9)).replace(/^phone_/, "+91 ");
+      host.appendChild(convButton(t.id, who, t.lastText, t.lastAt, "Support"));
+    });
+  }
+
+  /* live-update conversation list when someone replies */
+  (function refreshLoop() {
+    setInterval(function () { if (document.visibilityState === "visible") loadThreads(); }, 30000);
+  })();
+
+  var searchTimer = null;
+  document.getElementById("user-q").addEventListener("input", function () {
+    var t = this.value;
+    var box = document.getElementById("user-results");
+    clearTimeout(searchTimer);
+    if (t.trim().length < 2) { box.innerHTML = ""; return; }
+    searchTimer = setTimeout(function () {
+      fb.searchUsers(t, 6).then(function (rows) {
+        box.innerHTML = rows.length ? "" : '<div class="muted" style="font-size:.74rem;padding:.25rem .3rem">No learners found.</div>';
+        rows.forEach(function (r) {
+          if (r.uid === user.uid) return;
+          var b = document.createElement("button");
+          b.className = "conv-item";
+          b.innerHTML = '<span class="conv-ava"></span><span class="conv-txt"><b></b><span>Start a chat</span></span>';
+          b.querySelector(".conv-ava").textContent = initials(r.name || r.uid);
+          b.querySelector("b").textContent = r.name || r.uid;
+          b.addEventListener("click", function () {
+            var id = fb.threadId(user.uid, r.uid);
+            openThread(id, r.name);
+            var host = document.getElementById("thread-list");
+            if (!host.querySelector('[data-thread="' + id + '"]')) {
+              var empty = host.querySelector(".muted"); if (empty) empty.remove();
+              host.appendChild(convButton(id, r.name, "", Date.now()));
+            }
+            document.getElementById("user-q").value = "";
+            box.innerHTML = "";
+          });
+          box.appendChild(b);
+        });
+      }).catch(function () {});
+    }, 220);
+  });
+
+  function renderInbox(rows) {
+    var host = document.getElementById("inbox-list");
+    if (!rows) { host.innerHTML = '<div class="muted" style="font-size:.75rem">Unavailable.</div>'; return; }
+    var mine = rows.filter(function (m) { return m.from !== user.uid; });
+    host.innerHTML = mine.length ? "" : '<div class="muted" style="font-size:.75rem;padding:.2rem .3rem">No notifications.</div>';
+    mine.forEach(function (m) {
+      var el = document.createElement("div");
+      el.className = "notice-mini";
+      el.innerHTML = '<b></b><p></p><div class="mono muted" style="font-size:.6rem"></div>';
+      el.querySelector("b").textContent = (m.authorRole === "admin" || m.from === "admin" || m.kind === "report_reply") ? (m.fromName || "Admin") : (m.fromName || "Learner");
+      el.querySelector("p").textContent = m.text || "";
+      el.querySelector("div").textContent = timeAgo(m.at) + (m.read ? "" : " · new");
+      if (m.thread || (m.from && m.from !== "admin")) {
+        var rep = document.createElement("button");
+        rep.className = "btn btn-ghost btn-sm";
+        rep.style.marginTop = ".35rem";
+        rep.textContent = "↩ Reply";
+        rep.addEventListener("click", function () {
+          var tid = m.thread || (String(m.from).indexOf("support__") === 0 ? m.from : fb.threadId(user.uid, m.from));
+          openThread(tid, m.fromName || "Admin");
+        });
+        el.appendChild(rep);
+      }
+      host.appendChild(el);
+      if (!m.read) fb.markInboxRead(user.uid, m.id).catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>

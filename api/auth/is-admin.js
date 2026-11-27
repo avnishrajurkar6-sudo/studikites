@@ -13,6 +13,10 @@ catch (e) { http = null; missing.push('lib/http: ' + e.message); }
 try { verify = require('../../lib/verify'); }
 catch (e) { verify = null; missing.push('lib/verify: ' + e.message); }
 
+let firestore = null;
+try { firestore = require('../../lib/firestore-admin'); }
+catch (e) { firestore = null; }
+
 // ---- Fallbacks for lib/http ----
 function sendJson(req, res, status, body) {
   if (http && typeof http.sendJson === 'function') return http.sendJson(req, res, status, body);
@@ -76,13 +80,20 @@ module.exports = async function handler(req, res) {
   try {
     const identity = await checkIdToken(match[1]);
     const user = await userRecord(identity.uid, match[1]);
+    const allowlisted = adminEmails().includes(identity.email);
     const admin = !(user && user.banned) &&
-      (adminEmails().includes(identity.email) || !!(user && user.role === 'admin'));
+      (allowlisted || !!(user && user.role === 'admin'));
+    /* Persist the bootstrap role once so Firestore rules can recognise the
+       admin without re-checking the server allowlist on every write. */
+    if (allowlisted && !(user && user.role === 'admin') && firestore) {
+      firestore.patchDocument('users', identity.uid, { role: { stringValue: 'admin' } }, ['role'])
+        .catch(() => {});
+    }
     return sendJson(req, res, 200, {
       success: true,
       admin,
       uid: identity.uid,
-      via: adminEmails().includes(identity.email) ? 'allowlist' : admin ? 'role' : 'none',
+      via: allowlisted ? 'allowlist' : admin ? 'role' : 'none',
     });
   } catch (error) {
     console.error('[IS-ADMIN] error:', error && error.message);

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<title>Set up your space — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
+<meta name="description" content="Pick your batches and set your learning rhythm." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="theme-color" content="#090909" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .ob-bg { display:none; }
+  .ob-card { max-width:54rem; margin:0 auto; padding:clamp(1rem,3vw,2rem) 1rem 6rem; }
+  .ob-top { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+  .ob-top .brand-mark { width:2.6rem; height:2.6rem; }
+  .ob-main { margin-top:clamp(1.5rem,5vh,3rem); }
+  .ob-main h1 { font-size:clamp(1.9rem,5vw,2.9rem); margin:.5rem 0 .6rem; }
+  .ob-main > p { color:var(--muted); max-width:52ch; margin:0 0 1.4rem; }
+  .ob-actions { display:flex; align-items:center; gap:.6rem; margin-top:1.4rem; flex-wrap:wrap; }
+  .ob-actions .spacer { flex:1; }
+  .ob-goal { display:grid; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr)); gap:.75rem; }
+  .goal-tile { border:2px solid var(--line); background:var(--surface); border-radius:18px; padding:1.1rem .9rem; cursor:pointer; text-align:center; transition:all .2s cubic-bezier(.16,1,.3,1); }
+  .goal-tile:hover { transform:translateY(-3px); border-color:var(--line-strong); }
+  .goal-tile.on { border-color:var(--primary); background:var(--primary-softer); box-shadow:var(--ring); }
+  .goal-tile .goal-number { display:block; font:600 .68rem var(--mono); color:var(--muted); margin-bottom:.35rem; }
+  .goal-tile span { font-size:.78rem; color:var(--muted); font-weight:600; }
+  .ob-picks { display:grid; grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr)); gap:.7rem; max-height:min(52vh,32rem); overflow-y:auto; padding:.35rem .25rem .5rem; }
+  .ob-picks .pick-card img { background:var(--surface-3); min-height:5rem; }
+  .ob-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(13rem,1fr)); gap:1rem; }
+  .switch { display:flex; align-items:center; gap:.7rem; border:1px solid var(--line); background:var(--surface); border-radius:16px; padding:.85rem 1rem; cursor:pointer; }
+  .switch input { width:1.15rem; height:1.15rem; accent-color:var(--primary); }
+</style>
+</head>
+<body>
+<div class="onboard-shell">
+  <div class="ob-card">
+    <div class="ob-top">
+      <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+      <div class="step-dots" id="dots" aria-label="Progress"><span class="on"></span><span></span><span></span></div>
+    </div>
+
+    <!-- STEP 1 -->
+    <section class="ob-main onboard-step on" data-step="0">
+      <span class="kicker">Welcome aboard</span>
+      <h1>Let's make this <span style="color:var(--primary-dark)">yours.</span></h1>
+      <p>Three quick steps and your learning space is ready. First lecture of every batch is free.</p>
+      <label class="field" for="ob-name">What should we call you?</label>
+      <input class="input" id="ob-name" maxlength="40" placeholder="Your name" autocomplete="name" style="max-width:24rem" />
+      <div class="ob-goal" id="goals" style="margin-top:1.2rem" role="group" aria-label="Your goal">
+        <button type="button" class="goal-tile on" data-goal="board"><span class="goal-number">01</span><span>Board exams</span></button>
+        <button type="button" class="goal-tile" data-goal="school"><span class="goal-number">02</span><span>School</span></button>
+        <button type="button" class="goal-tile" data-goal="competitive"><span class="goal-number">03</span><span>Competitive</span></button>
+        <button type="button" class="goal-tile" data-goal="curious"><span class="goal-number">04</span><span>Just curious</span></button>
+      </div>
+      <div class="ob-actions"><span class="spacer"></span><button class="btn btn-primary btn-lg" id="ob-next1">Continue →</button></div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="ob-main onboard-step" data-step="1">
+      <span class="kicker">Step 2 of 3</span>
+      <h1>Pick your batches.</h1>
+      <p>Choose the ones you'll follow. You can change this any time from your profile.</p>
+      <div class="search" style="max-width:28rem"><span aria-hidden="true">⌕</span><input id="ob-q" type="search" placeholder="Search batches…" autocomplete="off" aria-label="Search batches" /></div>
+      <div style="display:flex;gap:.5rem;align-items:center;margin:.8rem 0">
+        <span class="mono muted" style="font-size:.72rem" id="ob-count">Loading…</span>
+        <button class="btn btn-ghost btn-sm" id="ob-select-all">Select popular</button>
+      </div>
+      <div class="ob-picks" id="ob-grid" aria-live="polite"></div>
+      <div class="ob-actions"><button class="btn btn-ghost" id="ob-back1">← Back</button><span class="spacer"></span><button class="btn btn-primary btn-lg" id="ob-next2">Continue →</button></div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="ob-main onboard-step" data-step="2">
+      <span class="kicker">Last step</span>
+      <h1>Set your rhythm.</h1>
+      <p>Consistency beats intensity. We'll nudge you only when you want it.</p>
+      <div class="ob-fields">
+        <div>
+          <label class="field" for="ob-mins">Minutes a day</label>
+          <input class="input" type="number" id="ob-mins" min="10" max="240" step="5" value="30" />
+        </div>
+        <div>
+          <label class="field" for="ob-level">Where are you now?</label>
+          <select class="input" id="ob-level">
+            <option value="beginner">Just starting</option>
+            <option value="revision">Revising</option>
+            <option value="advanced">I know this well</option>
+          </select>
+        </div>
+      </div>
+      <label class="switch" style="max-width:28rem;margin-top:1rem"><input type="checkbox" id="ob-remind" checked /><span><b>Daily reminder</b><br /><span class="muted" style="font-size:.82rem">A gentle nudge if you haven't studied by evening.</span></span></label>
+      <div class="ob-actions"><button class="btn btn-ghost" id="ob-back2">← Back</button><span class="spacer"></span><button class="btn btn-primary btn-lg" id="ob-finish">Open my dashboard </button></div>
+    </section>
+  </div>
+</div>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb, api = SK.api;
+  var step = 0, goal = "board", selected = [], batches = [], user = null, editing = /[?&]edit=1/.test(location.search);
+  ui.boot({ onboarding: true, status: "Preparing your space…" }).then(function (r) {
+    user = r.user;
+    if (!user) { location.replace("login.html?next=" + encodeURIComponent("onboarding.html" + location.search)); return; }
+    if (editing) {
+      fb.userDoc(user.uid).then(function (d) {
+        var o = (d && d.onboarding) || {};
+        selected = (o.batches || []).map(String);
+        var name = d && (d.displayName || d.name);
+        if (name) document.getElementById("ob-name").value = String(name).replace(/^\+91\s*/, "");
+        if (o.goal) { goal = o.goal; markGoal(); }
+        if (o.dailyMinutes) document.getElementById("ob-mins").value = o.dailyMinutes;
+        if (o.level) document.getElementById("ob-level").value = o.level;
+        document.getElementById("ob-remind").checked = o.reminders !== false;
+        document.getElementById("ob-finish").textContent = "Save changes ✓";
+      }).catch(function () {});
+    }
+    if (typeof fb.presenceBeat === "function") Promise.resolve(fb.presenceBeat("onboarding", "setting up")).catch(function () {});
+  }).catch(function () {});
+
+  function markGoal() {
+    document.querySelectorAll("#goals .goal-tile").forEach(function (t) { t.classList.toggle("on", t.dataset.goal === goal); });
+  }
+  document.querySelectorAll("#goals .goal-tile").forEach(function (t) {
+    t.addEventListener("click", function () { goal = t.dataset.goal; markGoal(); });
+  });
+  function go(n) {
+    step = n;
+    document.querySelectorAll(".onboard-step").forEach(function (s) { s.classList.toggle("on", Number(s.dataset.step) === n); });
+    document.querySelectorAll("#dots span").forEach(function (d, i) { d.classList.toggle("on", i <= n); });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  document.getElementById("ob-next1").addEventListener("click", function () { go(1); });
+  document.getElementById("ob-back1").addEventListener("click", function () { go(0); });
+  document.getElementById("ob-back2").addEventListener("click", function () { go(1); });
+
+  ui.load(true);
+  ui.skeleton(document.getElementById("ob-grid"), 6);
+  api.allBatches().then(function (list) {
+    batches = list;
+    render("");
+    ui.load(false);
+  }).catch(function () {
+    ui.load(false);
+    document.getElementById("ob-grid").innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Catalog unavailable</h3><p>Check your connection and retry.</p></div>';
+  });
+  function render(q) {
+    var host = document.getElementById("ob-grid"), s = String(q || "").trim().toLowerCase();
+    var list = s ? batches.filter(function (b) { return b.title.toLowerCase().indexOf(s) >= 0 || b.id.indexOf(s) >= 0; }) : batches;
+    document.getElementById("ob-count").textContent = list.length + " batches · " + selected.length + " selected";
+    host.innerHTML = "";
+    list.slice(0, 120).forEach(function (b, i) {
+      var card = document.createElement("button");
+      card.type = "button"; card.className = "pick-card" + (selected.indexOf(b.id) >= 0 ? " sel" : "");
+      card.style.animation = "rise .4s " + Math.min(i * .02, .4) + "s both";
+      card.innerHTML = '<img loading="lazy" alt="" /><span class="tick">✓</span><div class="pc-body"><div class="mono muted" style="font-size:.6rem">BATCH ' + ui.esc(b.id) + "</div><h4></h4></div>";
+      var img = card.querySelector("img"); img.src = b.thumbnail; img.alt = b.title;
+      img.onerror = function () { img.style.visibility = "hidden"; };
+      card.querySelector("h4").textContent = b.title;
+      card.addEventListener("click", function () {
+        var k = selected.indexOf(b.id);
+        if (k >= 0) selected.splice(k, 1); else selected.push(b.id);
+        card.classList.toggle("sel", k < 0);
+        document.getElementById("ob-count").textContent = list.length + " batches · " + selected.length + " selected";
+      });
+      host.appendChild(card);
+    });
+  }
+  document.getElementById("ob-q").addEventListener("input", function () { render(this.value); });
+  document.getElementById("ob-select-all").addEventListener("click", function () {
+    selected = batches.slice(0, 6).map(function (b) { return b.id; }); render(document.getElementById("ob-q").value);
+  });
+  document.getElementById("ob-next2").addEventListener("click", function () {
+    if (!selected.length) { ui.toast("Pick at least one batch", "Choose a batch to continue", "!"); return; }
+    go(2);
+  });
+
+  document.getElementById("ob-finish").addEventListener("click", async function () {
+    if (!user) { location.href = "login.html?next=" + encodeURIComponent("onboarding.html"); return; }
+    var name = document.getElementById("ob-name").value.trim().slice(0, 40);
+    if (name) {
+      try {
+        await fb.ensure();
+        var S = fb.raw().S, ref = S._fs.doc(S.sDb, "users", user.uid);
+        var snap = await S._fs.getDoc(ref);
+        if (!(snap.exists() && snap.data().displayName)) await S._fs.setDoc(ref, { displayName: name, name: name }, { merge: true });
+      } catch (e) {}
+    }
+    var payload = {
+      batches: selected,
+      goal: goal,
+      dailyMinutes: Number(document.getElementById("ob-mins").value) || 30,
+      level: document.getElementById("ob-level").value,
+      reminders: document.getElementById("ob-remind").checked
+    };
+    var btn = this; btn.disabled = true; btn.textContent = "Saving…";
+    ui.load(true);
+    fb.saveOnboarding(user.uid, payload).then(function () {
+      ui.load(false);
+      ui.toast("You're all set ", selected.length + " batch" + (selected.length === 1 ? "" : "es") + " ready", "");
+      setTimeout(function () { location.href = (new URLSearchParams(location.search).get("next") || "dashboard.html"); }, 850);
+    }).catch(function (e) {
+      ui.load(false); btn.disabled = false; btn.textContent = "Try again";
+      ui.toast("Couldn't save", (e && e.message) || "Check your connection");
+    });
+  });
+})();
+</script>
+</body>
+</html>

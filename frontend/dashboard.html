@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<title>Dashboard — StudiKitEZ</title>
+<meta name="description" content="Your learning home: progress, streaks, new lessons and the community lounge." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="theme-color" content="#090909" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .dash-hero { display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap; }
+  .dash-hero .ring-wrap { flex:none; }
+  .dash-hero .hero-copy { flex:1; min-width:14rem; }
+  .dash-hero h1 { margin:.3rem 0 .35rem; }
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr)); gap:.8rem; margin:1.2rem 0; }
+  .lesson-row { display:flex; align-items:center; gap:.75rem; border:1px solid var(--line); border-radius:14px; padding:.7rem .8rem; margin-top:.5rem; background:var(--surface); transition:transform .18s,border-color .18s; }
+  .lesson-row:hover { transform:translateX(3px); border-color:var(--primary); }
+  .lesson-ico { width:2.2rem; height:2.2rem; border-radius:12px; display:grid; place-items:center; background:var(--primary-soft); flex:none; }
+  .lesson-row .txt { flex:1; min-width:0; }
+  .lesson-row .txt b { font-size:.86rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chat-mini { display:flex; flex-direction:column; gap:.4rem; max-height:15rem; overflow-y:auto; padding-right:.2rem; }
+  .remind-row { display:flex; align-items:center; gap:.6rem; margin-top:.7rem; }
+  .day-pill { display:inline-flex; align-items:center; gap:.35rem; border-radius:999px; padding:.3rem .7rem; background:var(--accent-soft); color:#97590a; font-size:.78rem; font-weight:800; }
+  @media (prefers-color-scheme: dark) { .day-pill { color:#ffc46b; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a><a href="dashboard.html" class="on">Dashboard</a>
+      <a href="posts.html">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
+    </nav>
+    <span class="nav-spacer"></span>
+    <span class="nav-actions" id="auth-area"></span>
+    <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a><a href="dashboard.html" class="on">Dashboard</a>
+    <a href="posts.html">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
+    <a href="onboarding.html?edit=1">My batches</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap">
+  <section class="hero anim-rise" style="padding:clamp(1.2rem,3vw,2rem)">
+    <span class="blob a"></span><span class="blob b"></span>
+    <div class="dash-hero">
+      <div class="ring-wrap" aria-label="Overall progress">
+        <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true">
+          <circle class="ring-bg" cx="56" cy="56" r="46" stroke-width="10" />
+          <circle class="ring-fg" id="ring" cx="56" cy="56" r="46" stroke-width="10" stroke-dasharray="289" stroke-dashoffset="289" />
+        </svg>
+        <span class="ring-mid"><b id="ring-pct">0%</b><span>complete</span></span>
+      </div>
+      <div class="hero-copy">
+        <span class="kicker">Your learning home</span>
+        <h1 id="greet">Namaste, learner </h1>
+        <p id="sub">Small steps every day add up. Here's where you left off.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" id="continue-btn" href="index.html">Continue learning →</a>
+          <a class="btn btn-secondary" href="onboarding.html?edit=1">My batches</a>
+          <span class="day-pill" id="streak-pill">0 day streak</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="stat-grid" id="stats">
+    <section class="panel stat-card anim-rise"><div class="row"><span class="stat-ico">L</span><span class="stat-label">Lessons done</span></div><span class="stat-num countup" id="s-done">0</span></section>
+    <section class="panel stat-card anim-rise" style="--d:.05s"><div class="row"><span class="stat-ico warm">XP</span><span class="stat-label">XP earned</span></div><span class="stat-num countup" id="s-xp">0</span></section>
+    <section class="panel stat-card anim-rise" style="--d:.1s"><div class="row"><span class="stat-ico pink">S</span><span class="stat-label">Best streak</span></div><span class="stat-num countup" id="s-best">0</span></section>
+    <section class="panel stat-card anim-rise" style="--d:.15s"><div class="row"><span class="stat-ico green">B</span><span class="stat-label">My batches</span></div><span class="stat-num countup" id="s-batches">0</span></section>
+  </div>
+
+  <div class="bento">
+    <section class="panel span-8 reveal" aria-labelledby="cont-title">
+      <div class="row-head" style="justify-content:space-between"><div><span class="kicker">Continue learning</span><h2 id="cont-title" style="font-size:1.1rem">Pick up where you left off</h2></div><a class="btn btn-ghost btn-sm" href="index.html">All batches →</a></div>
+      <div id="continue-body" style="margin-top:.7rem"><div class="skel" style="height:5rem;border-radius:12px"></div></div>
+    </section>
+
+    <section class="panel span-4 reveal" aria-labelledby="streak-title">
+      <span class="kicker warm">Consistency</span><h2 id="streak-title" style="font-size:1.1rem">Your activity</h2>
+      <p class="sub">Every square is a day you studied. Like a GitHub calendar.</p>
+      <div class="heat" id="heatmap" role="img" aria-label="12-week activity heatmap" style="margin-top:.9rem"></div>
+      <div class="row-head" style="justify-content:space-between;margin-top:.5rem"><span class="mono muted" style="font-size:.66rem">12 weeks ago</span><span class="mono muted" style="font-size:.66rem" id="heat-total">— active days</span></div>
+      <div class="divider"></div>
+      <span class="kicker">Leaderboard</span>
+      <h3 style="font-size:.95rem;margin:.3rem 0 .1rem">Top learners</h3>
+      <p class="sub" style="margin:0 0 .4rem">XP earned from finished lessons.</p>
+      <div id="leaderboard"><span class="muted" style="font-size:.78rem">Loading…</span></div>
+    </section>
+
+    <section class="panel span-5 reveal" aria-labelledby="new-title">
+      <span class="kicker">Fresh for you</span><h2 id="new-title" style="font-size:1.1rem">New lessons</h2>
+      <p class="sub">The latest material from your batches.</p>
+      <div id="new-lessons" style="margin-top:.6rem"><span class="muted">Loading…</span></div>
+    </section>
+
+    <section class="panel span-4 reveal" aria-labelledby="lounge-title">
+      <span class="kicker">The lounge</span><h2 id="lounge-title" style="font-size:1.1rem">Study together</h2>
+      <p class="sub">Anyone can chat. Be kind.</p>
+      <div class="chat-mini" id="lounge-chat" aria-live="polite"></div>
+      <div class="chat-composer"><input class="input" id="lounge-input" maxlength="300" placeholder="Say hello…" aria-label="Chat message" /><button class="btn btn-primary chat-send" id="lounge-send" aria-label="Send message">➤</button></div>
+      <div class="divider"></div>
+      <div id="focus-mini" class="row-head"><span class="muted" style="font-size:.82rem">Checking focus rooms…</span></div>
+      <a class="btn btn-secondary btn-sm btn-block" style="margin-top:.7rem" href="focus.html">Open focus rooms →</a>
+    </section>
+
+    <section class="panel span-3 reveal" aria-labelledby="remind-title">
+      <span class="kicker">Gentle nudges</span><h2 id="remind-title" style="font-size:1.1rem">Reminders</h2>
+      <p class="sub">We'll remind you only if your streak is at risk.</p>
+      <label class="switch" style="display:flex;align-items:center;gap:.6rem;margin-top:.8rem;cursor:pointer"><input type="checkbox" id="rem-toggle" checked /><span style="font-size:.86rem;font-weight:700">Daily reminder</span></label>
+      <label class="field" for="rem-mins">Daily goal (minutes)</label>
+      <input class="input" type="number" id="rem-mins" min="10" max="240" step="5" value="30" />
+      <button class="btn btn-secondary btn-sm btn-block" style="margin-top:.7rem" id="rem-save">Save goal</button>
+      <div class="divider"></div>
+      <span class="kicker">Referrals</span>
+      <div class="stat-num" id="ref-n" style="font-size:1.2rem">—</div>
+      <div class="mono muted" style="font-size:.66rem" id="ref-sub">+1 referral credit per signup</div>
+      <div class="row" style="gap:.4rem;margin-top:.5rem">
+        <button class="btn btn-secondary btn-sm" style="flex:1" id="copy-ref">Copy link</button>
+        <button class="btn btn-ghost btn-sm" id="share-ref" aria-label="Share referral link">Share</button>
+      </div>
+      <div class="divider"></div>
+      <span class="kicker">Telegram</span>
+      <div id="tg-connect"><span class="muted" style="font-size:.78rem">Checking…</span></div>
+    </section>
+
+    <section class="panel span-7 reveal" aria-labelledby="ann-title">
+      <span class="kicker">From the team</span><h2 id="ann-title" style="font-size:1.1rem">Announcements</h2>
+      <div id="ann-body" style="margin-top:.6rem"><span class="muted">Loading…</span></div>
+    </section>
+
+    <section class="panel span-5 reveal" aria-labelledby="feed-title">
+      <span class="kicker">Community</span><h2 id="feed-title" style="font-size:1.1rem">Latest posts</h2>
+      <div id="feed-body" style="margin-top:.5rem"><span class="muted">Loading…</span></div>
+      <a class="btn btn-ghost btn-sm btn-block" style="margin-top:.7rem" href="posts.html">Visit community →</a>
+    </section>
+  </div>
+
+</div></main>
+
+<footer class="site-footer"><div class="wrap"><span class="muted" style="font-size:.82rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span><a href="contact.html" style="font-size:.82rem">Contact</a></div></footer>
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, api = SK.api, fb = SK.fb, user = null;
+  ui.boot({ login: true, status: "Opening your dashboard…" }).then(function (r) {
+    user = r.user;
+    ui.authArea();
+    var first = String(user.displayName || user.email || (user.mobile ? "+91 " + user.mobile : "learner")).replace(/^\+91\s*/, "").split(" ")[0];
+    document.getElementById("greet").textContent = "Welcome, " + first;
+    load();
+  }).catch(function () {});
+  ui.nav();
+
+  async function load() {
+    ui.load(true);
+    try {
+      /* Count today as an active day and push the local heatmap to Firestore. */
+      fb.activity(1);
+      fb.syncActivity(user.uid, true).catch(function () {});
+      var batches = await api.allBatches().catch(function () { return []; });
+      var mine = fb.myBatches();
+      if (!mine.length) {
+        var en = fb.enrolled();
+        mine = batches.filter(function (b) { return en.indexOf(b.id) >= 0; }).slice(0, 4).map(function (b) { return b.id; });
+      }
+      var picked = batches.filter(function (b) { return mine.indexOf(b.id) >= 0; });
+      document.getElementById("s-batches").textContent = picked.length;
+
+      var allDone = 0, totalWatched = 0, main = picked[0] || null, mainPct = 0, last = null;
+      for (var i = 0; i < picked.length; i++) {
+        var p = await fb.progress(user.uid, picked[i].id).catch(function () { return null; });
+        var w = (p && p.watched) || {};
+        Object.keys(w).forEach(function (k) {
+          totalWatched++;
+          if (w[k].done) allDone++;
+        });
+        if (picked[i].id === (fb.mainBatch() || (mine[0]))) {
+          main = picked[i];
+          var keys = Object.keys(w);
+          mainPct = keys.length ? Math.round(keys.filter(function (k) { return w[k].done; }).length / keys.length * 100) : 0;
+          last = p && p.lastContentId ? { id: p.lastContentId, title: p.lastTitle } : null;
+        }
+      }
+      document.getElementById("s-done").textContent = allDone;
+      var g = await fb.gamification(user.uid).catch(function () { return {}; });
+      var st = g.streak || {};
+      document.getElementById("s-xp").textContent = g.xp || 0;
+      document.getElementById("s-best").textContent = st.best || 0;
+      document.getElementById("streak-pill").textContent = (st.current || 0) + " day streak";
+
+      var ring = document.getElementById("ring"), circ = 2 * Math.PI * 46;
+      ring.style.strokeDasharray = String(circ);
+      ring.style.strokeDashoffset = String(circ * (1 - Math.min(100, mainPct) / 100));
+      ui.countUp(document.getElementById("ring-pct"), mainPct);
+
+      var cont = document.getElementById("continue-body");
+      if (main) {
+        var title = last && last.title ? last.title : main.title;
+        cont.innerHTML = '<div class="liverow"><div class="thumb" style="width:6.5rem;aspect-ratio:16/9;flex:none;border-radius:12px;overflow:hidden;background:var(--surface-2)"><img src="' + ui.esc(main.thumbnail) + '" alt="" onerror="this.style.display=\'none\'" /></div>' +
+          '<div style="flex:1;min-width:0"><div class="mono muted" style="font-size:.64rem">BATCH ' + ui.esc(main.id) + '</div><b style="display:block;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ui.esc(title || main.title) + '</b>' +
+          '<div class="progress thin" style="margin-top:.55rem"><div style="width:' + mainPct + '%"></div></div><div class="mono muted" style="font-size:.66rem;margin-top:.3rem">' + mainPct + '% complete</div></div></div>' +
+          '<div class="act-bar"><a class="btn btn-primary btn-sm" href="' + ui.esc(ui.courseUrl(main.title, main.id)) + '">Continue →</a><a class="btn btn-ghost btn-sm" href="play.html?course=' + ui.esc(main.id) + (last && last.id ? '&content=' + ui.esc(last.id) : '') + '">Resume lecture</a></div>';
+        document.getElementById("continue-btn").href = ui.courseUrl(main.title, main.id);
+      } else {
+        cont.innerHTML = '<div class="empty" style="padding:2rem 1rem"><h3>No batch yet</h3><p>Pick one in onboarding to get started.</p><a class="btn btn-primary btn-sm" href="onboarding.html">Choose a batch →</a></div>';
+      }
+
+      await heatmap();
+      leaderboard();
+      newLessons(picked.slice(0, 3));
+      focusMini(); announcements(); feed(); refs(); preferences(); tgConnect();
+      lounge();
+    } catch (e) {
+      console.warn(e);
+    }
+    ui.load(false);
+  }
+
+  async function heatmap() {
+    var host = document.getElementById("heatmap");
+    var summary = await fb.activitySummary(user.uid, 84).catch(function () { return { map: {}, active: 0, streak: 0 }; });
+    var map = summary.map || {};
+    var today = new Date(), html = "";
+    var start = new Date(today); start.setDate(start.getDate() - 83);
+    /* pad to a Sunday so columns line up as weeks */
+    var pad = start.getDay();
+    for (var i = 0; i < pad; i++) html += '<span style="opacity:.25" aria-hidden="true"></span>';
+    for (var d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+      var key = fb.dayKey(d), n = Number(map[key]) || 0;
+      var lv = n <= 0 ? 0 : n < 3 ? 1 : n < 6 ? 2 : n < 10 ? 3 : 4;
+      html += '<span data-l="' + lv + '" title="' + key + ' · ' + n + ' activities" aria-label="' + key + ': ' + n + '"></span>';
+    }
+    host.innerHTML = html;
+    document.getElementById("heat-total").textContent = (summary.active || 0) + " active days · " + (summary.streak || 0) + "d streak";
+  }
+
+  async function leaderboard() {
+    var host = document.getElementById("leaderboard");
+    var rows = await fb.leaderboard(40).catch(function () { return []; });
+    if (!rows.length) { host.innerHTML = '<span class="muted" style="font-size:.78rem">Finish a lesson to appear here.</span>'; return; }
+    var myIdx = -1;
+    rows.forEach(function (r, i) { if (r.uid === user.uid) myIdx = i; });
+    var show = rows.slice(0, 6);
+    if (myIdx >= 6) show = show.concat([rows[myIdx]]);
+    host.innerHTML = "";
+    show.forEach(function (r, i) {
+      var rank = rows.indexOf(r) + 1;
+      var el = document.createElement("div");
+      el.className = "leader-row" + (r.uid === user.uid ? " me" : "");
+      el.innerHTML = '<span class="leader-rank">' + rank + '</span><span class="leader-name"></span><span class="leader-xp">' + ui.esc(String(r.xp || 0)) + ' XP</span>';
+      el.querySelector(".leader-name").textContent = r.name || "Learner";
+      if (r.uid === user.uid) el.querySelector(".leader-name").textContent += " (you)";
+      host.appendChild(el);
+    });
+  }
+
+  async function newLessons(picked) {
+    var host = document.getElementById("new-lessons");
+    var items = [];
+    for (var i = 0; i < picked.length && items.length < 5; i++) {
+      try {
+        var root = await api.content(picked[i].id, "0");
+        (root || []).forEach(function (x) {
+          if (items.length >= 5) return;
+          if (x.type === "file") items.push({ id: x.entity_id, title: x.name || x.title || "Lecture", course: picked[i].id });
+        });
+      } catch (e) {}
+    }
+    if (!items.length) {
+      host.innerHTML = '<div class="empty" style="padding:1.5rem 1rem"><h3>Nothing new yet</h3><p>New lessons appear here when your batches are updated.</p></div>';
+      return;
+    }
+    host.innerHTML = "";
+    items.forEach(function (it, i) {
+      var row = document.createElement("a");
+      row.className = "lesson-row";
+      row.style.animation = "rise .4s " + (i * .05) + "s both";
+      row.href = "play.html?course=" + encodeURIComponent(it.course) + "&content=" + encodeURIComponent(it.id) + "&title=" + encodeURIComponent(it.title);
+      row.innerHTML = '<span class="lesson-ico">▶</span><span class="txt"><b></b><span class="mono muted" style="font-size:.62rem">BATCH ' + ui.esc(it.course) + ' · new</span></span><span class="badge-new">NEW</span>';
+      row.querySelector("b").textContent = it.title;
+      host.appendChild(row);
+    });
+  }
+
+  function lounge() {
+    var host = document.getElementById("lounge-chat");
+    var off = fb.watchThread("community", function (m) {
+      if (!m) return;
+      var row = document.createElement("div");
+      row.className = "chat-row" + (m.uid === user.uid ? " mine" : "");
+      row.innerHTML = '<div class="bubble"><span class="who"></span><span></span></div>';
+      row.querySelector(".who").textContent = String(m.name || "learner").slice(0, 30);
+      row.querySelector(".bubble span:last-child").textContent = String(m.text || "").slice(0, 300);
+      host.appendChild(row);
+      host.scrollTop = host.scrollHeight;
+    });
+    window.addEventListener("pagehide", function () { try { off(); } catch (e) {} });
+    function send() {
+      var inp = document.getElementById("lounge-input"), t = inp.value.trim();
+      if (!t) return;
+      inp.value = "";
+      fb.sendMsg("community", t).catch(function () { ui.toast("Couldn't send", "Try again"); });
+    }
+    document.getElementById("lounge-send").addEventListener("click", send);
+    document.getElementById("lounge-input").addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
+  }
+
+  async function focusMini() {
+    var host = document.getElementById("focus-mini");
+    try {
+      var rooms = await fb.focusRooms(), best = null, n = 0;
+      (rooms || []).forEach(function (r) {
+        var m = r.members || {}, now = Date.now();
+        var c = Object.keys(m).filter(function (k) { return now - ((m[k] || {}).at || 0) < 90000; }).length;
+        if (c > n) { n = c; best = r; }
+      });
+      host.innerHTML = n
+        ? '<span class="live-dot"></span><div style="flex:1"><b style="font-size:.85rem">' + ui.esc(best.name || best.id) + '</b><div class="muted" style="font-size:.72rem">' + n + ' studying now</div></div>'
+        : '<span class="muted" style="font-size:.82rem">No live room right now — start one.</span>';
+    } catch (e) { host.innerHTML = '<span class="muted" style="font-size:.82rem">Rooms offline.</span>'; }
+  }
+  async function announcements() {
+    var host = document.getElementById("ann-body");
+    var list = await fb.announcements(4).catch(function () { return []; });
+    if (!list.length) { host.innerHTML = '<span class="muted">Nothing new right now.</span>'; return; }
+    host.innerHTML = "";
+    list.forEach(function (a) {
+      var el = document.createElement("div");
+      el.className = "ann-item";
+      el.innerHTML = '<div style="min-width:0;flex:1"><div class="a-title" style="font-weight:700;font-size:.86rem"></div><div class="a-body muted" style="font-size:.8rem;white-space:pre-wrap"></div></div>';
+      el.querySelector(".a-title").textContent = a.title;
+      el.querySelector(".a-body").textContent = a.body || "";
+      host.appendChild(el);
+    });
+  }
+  async function feed() {
+    var host = document.getElementById("feed-body");
+    var posts = await fb.postsRecent(3).catch(function () { return []; });
+    if (!posts.length) { host.innerHTML = '<p class="muted">Be the first to ask a doubt.</p>'; return; }
+    host.innerHTML = "";
+    posts.forEach(function (p) {
+      var el = document.createElement("div");
+      el.className = "feed-item";
+      el.innerHTML = '<div class="mono muted" style="font-size:.64rem;margin-bottom:.2rem"></div><div style="font-size:.86rem"></div>';
+      el.children[0].textContent = p.name + (p.at ? " · " + ui.timeAgo(p.at) : "");
+      el.children[1].textContent = p.text;
+      host.appendChild(el);
+    });
+  }
+  function refLink() {
+    var base = location.origin + location.pathname.replace(/dashboard\.html$/, "login.html");
+    return base + "?ref=" + encodeURIComponent(user.uid);
+  }
+  async function refs() {
+    fb.claimRewards().catch(function () {});
+    var r = await fb.myReferrals().catch(function () { return { count: 0, freeDaysLeft: 0 }; });
+    document.getElementById("ref-n").textContent = r.count;
+    document.getElementById("ref-sub").textContent = r.freeDaysLeft + " reward day(s) banked · +1 day per verified signup";
+    document.getElementById("copy-ref").addEventListener("click", function () {
+      var link = refLink();
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(function () { ui.toast("Copied ✓", "Referral link ready"); });
+      else prompt("Copy referral link:", link);
+    });
+    document.getElementById("share-ref").addEventListener("click", function () {
+      var link = refLink();
+      if (navigator.share) {
+        navigator.share({ title: "StudiKitEZ", text: "Learn with me on StudiKitEZ — first lecture free.", url: link }).catch(function () {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(link).then(function () { ui.toast("Copied ✓", "Share it anywhere"); });
+      } else prompt("Copy referral link:", link);
+    });
+  }
+
+  async function tgConnect() {
+    var host = document.getElementById("tg-connect");
+    var status = await fb.telegramStatus(user.uid).catch(function () { return null; });
+    if (status && status.id) {
+      host.innerHTML = '<div class="row" style="gap:.5rem;align-items:center"><span class="live-dot"></span><div style="flex:1;min-width:0"><b style="font-size:.82rem">Connected</b><div class="muted" style="font-size:.7rem">' + ui.esc("@" + (status.username || status.id)) + '</div></div></div>';
+      return;
+    }
+    host.innerHTML = '<p class="muted" style="font-size:.75rem;margin:.2rem 0 .5rem">Join the community group and verify to receive updates.</p><button class="btn btn-secondary btn-sm btn-block" id="tg-start">Connect Telegram</button>';
+    var b = document.getElementById("tg-start");
+    b.addEventListener("click", async function () {
+      var tab = window.open("about:blank", "_blank");
+      b.disabled = true;
+      try {
+        var link = await fb.telegramLink();
+        if (!link || !link.token) throw new Error("Link could not be created");
+        var target = link.url || ui.botUrl("skv1_" + link.token);
+        if (tab) tab.location.replace(target); else location.href = target;
+      } catch (e) {
+        if (tab) tab.close();
+        b.disabled = false;
+        ui.toast("Telegram unavailable", e.message || "Try again later");
+      }
+    });
+  }
+  async function preferences() {
+    var d = await fb.userDoc(user.uid).catch(function () { return null; });
+    var o = (d && d.onboarding) || {};
+    document.getElementById("rem-toggle").checked = o.reminders !== false;
+    document.getElementById("rem-mins").value = o.dailyMinutes || 30;
+    document.getElementById("rem-save").addEventListener("click", async function () {
+      var payload = { reminders: document.getElementById("rem-toggle").checked, dailyMinutes: Number(document.getElementById("rem-mins").value) || 30 };
+      try {
+        await fb.saveOnboarding(user.uid, Object.assign({}, o, payload));
+        ui.toast("Saved ✓", "Your reminder settings are updated");
+      } catch (e) { ui.toast("Couldn't save", "Check your connection"); }
+    });
+  }
+})();
+</script>
+</body>
+</html>

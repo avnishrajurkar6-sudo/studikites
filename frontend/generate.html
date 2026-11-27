@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#090909" />
+<title>Key Manager — StudiKitEZ</title>
+<meta name="generator" content="AVkings Engine" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="app.html">App</a>
+    </nav>
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span id="auth-area" style="display:flex;gap:.5rem"></span>
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+    </span>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="app.html">App</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap" style="max-width:56rem">
+  <div class="page-head anim-rise">
+    <span class="kicker">Admin only</span>
+    <h1>Key Manager</h1>
+    <p>Generate and manage playback keys. Format <span class="mono">SK-XXXX-XXXX</span>, 48h expiry.</p>
+  </div>
+
+  <section class="panel anim-rise" style="--d:.05s" aria-label="Generate key">
+    <div class="row-head" style="justify-content:space-between">
+      <span class="kicker" style="margin:0">Generate new key</span>
+      <span class="chip">48h expiry</span>
+    </div>
+    <div style="display:flex;gap:.6rem;align-items:center;margin-top:.8rem;flex-wrap:wrap">
+      <button class="btn btn-primary" id="gen-btn">Key Generate Key</button>
+      <span class="mono muted" style="font-size:.68rem">Format SK-XXXX-XXXX · 1 device</span>
+    </div>
+    <div class="row-card" id="keyout" style="display:none;margin-top:.9rem">
+      <div class="mono muted" style="font-size:.62rem;letter-spacing:.15em">GENERATED KEY</div>
+      <div class="mono" id="gen-key" style="font-size:1.15rem;font-weight:700;letter-spacing:.06em;margin:.25rem 0"></div>
+      <div class="mono muted" id="gen-exp" style="font-size:.7rem"></div>
+      <div class="act-bar"><button class="btn btn-secondary btn-sm" id="copy-btn">⧉ Copy</button></div>
+    </div>
+  </section>
+
+  <section class="panel anim-rise" style="--d:.1s;margin-top:1rem" aria-label="All keys">
+    <div class="row-head" style="justify-content:space-between">
+      <span class="kicker" style="margin:0">All keys <span id="key-count" class="muted"></span></span>
+      <div style="display:flex;gap:.4rem">
+        <input class="input" id="q" placeholder="Search keys…" style="font-size:.8rem;min-height:38px" />
+        <button class="btn btn-ghost btn-sm" id="reload-btn">Reload</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:.7rem">
+      <table class="tbl">
+        <thead><tr><th>Key</th><th>Created</th><th>Expires</th><th>Status</th><th>Devices</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" style="display:none;margin-top:.8rem"><h3>No keys yet</h3><p>Generate your first key above.</p></div>
+    <div style="text-align:center;margin-top:.6rem">
+      <button class="btn btn-ghost btn-sm" id="more-btn" style="display:none">Load more</button>
+      <p class="mono muted" style="font-size:.65rem" id="showing"></p>
+    </div>
+  </section>
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.85rem">© 2026 StudiKitEZ · Admin route.</span>
+  <a href="index.html" style="font-size:.85rem">Home</a>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var F = null, gdb = null, keys = [], visible = 20, filter = "";
+
+  ui.boot({ login: true, admin: true, status: "Checking key access…" }).then(function (r) {
+    var raw = fb.raw(); F = raw.S._fs; gdb = raw.S.gDb;
+    ui.nav(); ui.authArea();
+    load();
+  }).catch(function () {});
+
+  function seg() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
+  function num(v) { return typeof v === "number" ? v : 0; }
+
+  function render() {
+    var q = filter.toLowerCase();
+    var list = q ? keys.filter(function (k) { return (k.key + " " + k.id).toLowerCase().indexOf(q) >= 0; }) : keys;
+    var show = list.slice(0, visible);
+    document.getElementById("key-count").textContent = "(" + list.length + ")";
+    document.getElementById("empty").style.display = list.length ? "none" : "block";
+    var tb = document.getElementById("rows");
+    tb.innerHTML = "";
+    show.forEach(function (k) {
+      var live = k.status === "active" && k.expiresAt > Date.now();
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td class='mono' style='font-weight:700'></td><td class='mono muted' style='font-size:.72rem'></td>" +
+        "<td class='mono muted' style='font-size:.72rem'></td><td></td><td class='mono' style='font-size:.75rem'></td>" +
+        "<td style='text-align:right'><button class='btn btn-ghost btn-sm'>Revoke</button></td>";
+      tr.children[0].textContent = k.key;
+      tr.children[1].textContent = new Date(k.createdAt).toLocaleDateString("en-IN");
+      tr.children[2].textContent = new Date(k.expiresAt).toLocaleDateString("en-IN");
+      tr.children[3].innerHTML = live ? '<span class="chip on">active</span>' : '<span class="chip bad">dead</span>';
+      tr.children[4].textContent = (k.registeredDevices || []).length + "/" + (k.maxDevices || 1);
+      tr.querySelector("button").addEventListener("click", function () {
+        if (!confirm("Revoke key " + k.key + "?")) return;
+        F.deleteDoc(F.doc(gdb, "valid_keys", k.id)).then(function () {
+          ui.toast("Revoked", "Key deleted"); load();
+        }).catch(function () { ui.toast("Revoke failed", "Try again"); });
+      });
+      tb.appendChild(tr);
+    });
+    var more = document.getElementById("more-btn");
+    if (visible < list.length) { more.style.display = "inline-flex"; more.textContent = "Load more (" + (list.length - visible) + ")"; }
+    else more.style.display = "none";
+    document.getElementById("showing").textContent = list.length ? "Showing " + show.length + " of " + list.length : "";
+  }
+
+  function load() {
+    document.getElementById("rows").innerHTML = "<tr><td colspan='6' class='muted' style='text-align:center'>Loading…</td></tr>";
+    F.getDocs(F.query(F.collection(gdb, "valid_keys"), F.orderBy("createdAt", "desc"), F.limit(200))).then(function (snap) {
+      keys = [];
+      snap.forEach(function (d) {
+        var v = d.data() || {};
+        keys.push({ id: d.id, key: v.key || d.id, createdAt: num(v.createdAt), expiresAt: num(v.expiresAt), status: v.status || "active", maxDevices: v.maxDevices || 1, registeredDevices: v.registeredDevices || [] });
+      });
+      render();
+    }).catch(function () {
+      keys = []; render();
+      ui.toast("Failed to load", "Could not fetch keys");
+    });
+  }
+
+  document.getElementById("more-btn").addEventListener("click", function () { visible += 20; render(); });
+  document.getElementById("q").addEventListener("input", function () { filter = this.value; visible = 20; render(); });
+  document.getElementById("reload-btn").addEventListener("click", load);
+
+  document.getElementById("gen-btn").addEventListener("click", function () {
+    var btn = this;
+    btn.disabled = true; btn.textContent = "Generating…";
+    var key = "SK-" + seg() + "-" + seg();
+    var now = Date.now(), exp = now + 48 * 60 * 60 * 1000;
+    F.setDoc(F.doc(gdb, "valid_keys", key), {
+      key: key, createdAt: now, expiresAt: exp, status: "active", maxDevices: 1, registeredDevices: []
+    }).then(function () {
+      document.getElementById("keyout").style.display = "block";
+      document.getElementById("gen-key").textContent = key;
+      document.getElementById("gen-exp").textContent = "Expires: " + new Date(exp).toLocaleString("en-IN");
+      ui.toast("Key generated", key + " — valid 48 hours");
+      load();
+    }).catch(function () { ui.toast("Generation failed", "Try again"); })
+      .then(function () { btn.disabled = false; btn.textContent = "Key Generate Key"; });
+  });
+  document.getElementById("copy-btn").addEventListener("click", function () {
+    var t = document.getElementById("gen-key").textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { ui.toast("Copied", "Key copied to clipboard"); });
+    else prompt("Copy key:", t);
+  });
+})();
+</script>
+</body>
+</html>

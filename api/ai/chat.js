@@ -1,7 +1,7 @@
 /* POST /api/ai/chat — AI study helper (doubt solve / explain / quiz).
    Strictly gated: verified request source (site key) + signed-in user.
    The xKiro key lives ONLY in env XKIRO_API_KEY — never in code, never shipped. */
-const { sendJson, sendOptions, requireMethod, readJsonBody, fetchUpstream } = require("../../lib/http");
+const { sendJson, sendOptions, requireMethod, readJsonBody, fetchUpstream, rateLimit } = require("../../lib/http");
 const { authorize } = require("../../lib/verify");
 
 const MODES = {
@@ -15,6 +15,7 @@ const MODES = {
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return sendOptions(req, res);
   if (!requireMethod(req, res, ["POST"])) return;
+  if (!rateLimit(req, res, "ai-chat", 15, 60_000)) return;
   try {
     const who = await authorize(req, {});
     const key = String(process.env.XKIRO_API_KEY || "").trim();

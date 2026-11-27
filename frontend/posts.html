@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#090909" />
+<title>Community — StudiKitEZ</title>
+<meta name="description" content="Share study ideas, ask doubts, vote in polls and discuss with the StudiKitEZ community." />
+<meta name="sk-backend" content="https://studikites.vercel.app" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .post-card + .post-card { margin-top: .7rem; }
+  .compose-row { display: flex; gap: .7rem; align-items: flex-start; }
+  .poll-builder { margin-top: .7rem; display: grid; gap: .45rem; }
+  .poll-builder .input { font-size: .86rem; }
+  .poll-builder .opt-row { display: flex; gap: .4rem; align-items: center; }
+  .feed-tabs { display: flex; gap: .4rem; margin: 1rem 0 .7rem; }
+  .feed-tabs button { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: .4rem .85rem; font: 700 .8rem var(--font); cursor: pointer; }
+  .feed-tabs button.on { background: var(--primary-soft); color: var(--primary-dark); border-color: color-mix(in srgb, var(--primary) 30%, transparent); }
+  .char-count { font: 600 .7rem var(--mono); color: var(--muted); }
+  .char-count.warn { color: var(--danger); }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a>
+      <a href="posts.html" class="on">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
+    </nav>
+    <span class="nav-spacer"></span>
+    <span class="nav-actions" id="auth-area"></span>
+    <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">Menu</button>
+  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+    <a href="index.html">Catalog</a><a href="dashboard.html">Dashboard</a>
+    <a href="posts.html" class="on">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
+  </nav>
+</header>
+
+<main class="page" id="main"><div class="wrap feed-shell">
+  <div class="page-head anim-rise">
+    <span class="kicker">Community</span>
+    <h1>Study talk</h1>
+    <p>Ask doubts, share wins, run a quick poll. Be kind — posts can be reported.</p>
+  </div>
+
+  <section class="panel composer-card anim-rise" aria-label="Create a post">
+    <div class="compose-row">
+      <div class="composer-ava" id="compose-ava">S</div>
+      <div style="flex:1;min-width:0">
+        <textarea id="post-body" rows="2" maxlength="5000" placeholder="What are you studying today?" aria-label="Post text" style="width:100%"></textarea>
+        <input class="input" id="post-title" maxlength="120" placeholder="Headline (optional)" style="margin-top:.35rem;display:none" />
+        <div class="poll-builder" id="poll-builder" style="display:none">
+          <input class="input" id="poll-q" maxlength="140" placeholder="Poll question" />
+          <div id="poll-opts">
+            <div class="opt-row"><input class="input" data-opt maxlength="80" placeholder="Option 1" /></div>
+            <div class="opt-row" style="margin-top:.4rem"><input class="input" data-opt maxlength="80" placeholder="Option 2" /></div>
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn btn-ghost btn-sm" id="poll-add" type="button">+ Add option</button>
+            <button class="btn btn-ghost btn-sm" id="poll-remove" type="button">Remove poll</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.45rem;margin-top:.55rem;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" id="headline-toggle" type="button" title="Add a headline">Headline</button>
+          <button class="btn btn-ghost btn-sm" id="poll-toggle" type="button" title="Add a poll">Poll</button>
+          <span style="flex:1"></span>
+          <span class="char-count" id="char-count">0 / 5000</span>
+          <button class="btn btn-primary btn-sm" id="post-send" type="button">Post</button>
+        </div>
+        <p class="muted" id="compose-note" style="font-size:.74rem;margin:.45rem 0 0;display:none">Sign in to post.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="feed-tabs" id="feed-tabs" role="tablist" aria-label="Feed filter">
+    <button class="on" data-tab="all" role="tab" aria-selected="true">For you</button>
+    <button data-tab="doubt" role="tab" aria-selected="false">Doubts</button>
+    <button data-tab="poll" role="tab" aria-selected="false">Polls</button>
+  </div>
+
+  <div id="feed" aria-live="polite"></div>
+  <div id="feed-loading" style="display:grid;place-items:center;padding:2.5rem 0"><div class="spinner"></div></div>
+  <div id="feed-empty" class="empty" style="display:none"><h3>No posts yet</h3><p>Be the first to share something!</p></div>
+
+</div></main>
+
+<footer class="site-footer"><div class="wrap">
+  <span class="muted" style="font-size:.82rem">© 2026 StudiKitEZ · Built by AVkings · Learn calmly.</span>
+  <span style="display:flex;gap:1rem"><a href="contact.html" style="font-size:.82rem">Contact</a><a href="https://t.me/studikitez" target="_blank" rel="noopener" style="font-size:.82rem">Telegram</a></span>
+</div></footer>
+
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  ui.boot({ status: "Loading the community…" }).catch(function () {});
+  ui.nav(); ui.telegramNag(); ui.authArea();
+  var F = null, db = null, me = null, isAdmin = false, posts = [], off = null, tab = "all";
+
+  function timeAgo(ms) {
+    if (!ms) return "";
+    var s = Math.floor((Date.now() - ms) / 1000);
+    if (s < 60) return s + "s";
+    if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    return Math.floor(s / 86400) + "d";
+  }
+  function initials(name) {
+    var s = String(name || "U").trim();
+    return s ? s.charAt(0).toUpperCase() : "U";
+  }
+  function isPoll(p) { return !!(p && p.poll && p.poll.options && p.poll.options.length >= 2); }
+
+  fb.ensure().then(function () {
+    var r = fb.raw(); F = r.S._fs; db = r.S.sDb;
+    return fb.currentUser();
+  }).then(function (u) {
+    me = u;
+    document.getElementById("compose-note").style.display = u ? "none" : "block";
+    if (u) {
+      document.getElementById("compose-ava").textContent = initials(u.displayName || u.email || u.mobile);
+      return fb.isAdmin(u.uid).then(function (ok) { isAdmin = ok; });
+    }
+  }).then(function () {
+    loadFeed();
+  }).catch(function () {
+    document.getElementById("feed-loading").style.display = "none";
+    document.getElementById("feed-empty").style.display = "block";
+    document.querySelector("#feed-empty h3").textContent = "Couldn't load posts";
+    document.querySelector("#feed-empty p").textContent = "Check your connection and refresh.";
+  });
+
+  /* ---------------- composer ---------------- */
+  var body = document.getElementById("post-body");
+  body.addEventListener("input", function () {
+    var n = body.value.length;
+    var c = document.getElementById("char-count");
+    c.textContent = n + " / 5000";
+    c.classList.toggle("warn", n > 4800);
+    body.style.height = "auto";
+    body.style.height = Math.min(240, body.scrollHeight) + "px";
+  });
+  document.getElementById("headline-toggle").addEventListener("click", function () {
+    var t = document.getElementById("post-title");
+    t.style.display = t.style.display === "none" ? "block" : "none";
+    if (t.style.display === "block") t.focus();
+  });
+  document.getElementById("poll-toggle").addEventListener("click", function () {
+    var b = document.getElementById("poll-builder");
+    b.style.display = b.style.display === "none" ? "grid" : "none";
+    if (b.style.display === "grid") document.getElementById("poll-q").focus();
+  });
+  document.getElementById("poll-add").addEventListener("click", function () {
+    var host = document.getElementById("poll-opts");
+    if (host.children.length >= 6) return ui.toast("Six options max", "");
+    var row = document.createElement("div");
+    row.className = "opt-row";
+    row.style.marginTop = ".4rem";
+    row.innerHTML = '<input class="input" data-opt maxlength="80" placeholder="Option ' + (host.children.length + 1) + '" />';
+    host.appendChild(row);
+    row.querySelector("input").focus();
+  });
+  document.getElementById("poll-remove").addEventListener("click", function () {
+    document.getElementById("poll-q").value = "";
+    document.getElementById("poll-opts").innerHTML =
+      '<div class="opt-row"><input class="input" data-opt maxlength="80" placeholder="Option 1" /></div>' +
+      '<div class="opt-row" style="margin-top:.4rem"><input class="input" data-opt maxlength="80" placeholder="Option 2" /></div>';
+    document.getElementById("poll-builder").style.display = "none";
+  });
+
+  function pollInput() {
+    var q = document.getElementById("poll-q").value.trim();
+    var opts = [];
+    document.querySelectorAll("#poll-opts [data-opt]").forEach(function (i) { if (i.value.trim()) opts.push(i.value.trim()); });
+    if (!q || opts.length < 2) return null;
+    return { question: q, options: opts };
+  }
+
+  document.getElementById("post-send").addEventListener("click", async function () {
+    if (!me) return ui.toast("Sign in required", "Sign in to post");
+    var text = body.value.trim();
+    var title = document.getElementById("post-title").value.trim();
+    var poll = document.getElementById("poll-builder").style.display === "grid" ? pollInput() : null;
+    if (!text && !poll) return ui.toast("Write something", "Add a thought or a poll");
+    var btn = this; btn.disabled = true; btn.textContent = "Posting…";
+    try {
+      await fb.createPost({ title: title, body: text, poll: poll });
+      body.value = ""; document.getElementById("post-title").value = "";
+      document.getElementById("poll-q").value = "";
+      document.getElementById("poll-builder").style.display = "none";
+      document.getElementById("char-count").textContent = "0 / 5000";
+      ui.toast("Posted", "Your post is live");
+      loadFeed();
+    } catch (e) {
+      ui.toast("Couldn't post", e.message === "signin" ? "Sign in to post" : "Write denied — try again");
+    }
+    btn.disabled = false; btn.textContent = "Post";
+  });
+
+  /* ---------------- feed ---------------- */
+  function visible() {
+    return posts.filter(function (p) {
+      if (tab === "poll") return isPoll(p);
+      if (tab === "doubt") return /doubt|how|why|help|question|\?/i.test(String(p.title || "") + " " + String(p.body || ""));
+      return true;
+    });
+  }
+
+  function loadFeed() {
+    var loading = document.getElementById("feed-loading");
+    loading.style.display = "grid";
+    if (off) { try { off(); } catch (e) {} off = null; }
+    try {
+      var q = F.query(F.collection(db, "posts"), F.orderBy("at", "desc"), F.limit(40));
+      off = F.onSnapshot(q, function (snap) {
+        posts = [];
+        snap.forEach(function (d) { posts.push(Object.assign({ id: d.id }, d.data() || {})); });
+        loading.style.display = "none";
+        renderFeed();
+      }, function () {
+        loading.style.display = "none";
+        document.getElementById("feed-empty").style.display = "block";
+      });
+    } catch (e) {
+      loading.style.display = "none";
+      document.getElementById("feed-empty").style.display = "block";
+    }
+  }
+
+  function renderFeed() {
+    var feed = document.getElementById("feed");
+    var list = visible();
+    feed.innerHTML = "";
+    document.getElementById("feed-empty").style.display = list.length ? "none" : "block";
+    document.getElementById("feed-empty").querySelector("h3").textContent = tab === "poll" ? "No polls yet" : "No posts yet";
+    list.forEach(function (p, i) {
+      var card = postCard(p);
+      card.style.setProperty("--d", Math.min(i * 0.03, 0.3) + "s");
+      feed.appendChild(card);
+    });
+  }
+
+  function postCard(p) {
+    var el = document.createElement("article");
+    el.className = "post-card anim-rise";
+    el.setAttribute("data-id", p.id);
+    var adminPost = p.authorRole === "admin";
+    var canDel = (me && p.uid === me.uid) || isAdmin;
+    var name = adminPost ? "Admin" : (p.authorName || "User");
+    el.innerHTML =
+      '<div class="post-head">' +
+        '<div class="post-ava' + (adminPost ? " admin" : "") + '">' + ui.esc(initials(name)) + '</div>' +
+        '<div style="min-width:0;flex:1"><div class="post-name"><span class="nm"></span>' +
+          (adminPost ? '<span class="post-badge">Admin</span>' : '') +
+        '</div><div class="post-time">' + ui.esc(timeAgo(p.at)) + ' ago</div></div>' +
+        (canDel ? '<button class="post-act" data-a="del" title="Delete">✕</button>' : '') +
+      '</div>' +
+      (p.title ? '<h3 class="post-title"></h3>' : '') +
+      (p.body ? '<div class="post-body"></div>' : '') +
+      (isPoll(p) ? '<div class="poll-wrap" data-poll></div>' : '') +
+      '<div class="post-actions">' +
+        '<button class="post-act" data-a="like">♥ <span>' + (Number(p.likeCount) || 0) + '</span></button>' +
+        '<button class="post-act" data-a="comments">💬 Comments</button>' +
+        '<button class="post-act" data-a="report">⚑ Report</button>' +
+      '</div>' +
+      '<div class="reply-row" data-a="cform" style="display:none"><input class="input" maxlength="500" placeholder="Write a comment…" style="flex:1;font-size:.85rem" /><button class="btn btn-primary btn-sm">Send</button></div>' +
+      '<div class="chat-box" data-a="clist" style="display:none;margin-top:.6rem;max-height:16rem"></div>';
+    el.querySelector(".nm").textContent = name;
+    if (p.title) el.querySelector(".post-title").textContent = p.title;
+    if (p.body) el.querySelector(".post-body").textContent = p.body;
+    if (isPoll(p)) renderPoll(el.querySelector("[data-poll]"), p);
+
+    el.querySelector('[data-a="like"]').addEventListener("click", async function () {
+      if (!me) return ui.toast("Sign in required", "Sign in to like posts");
+      var btn = this; btn.disabled = true;
+      try {
+        var likeRef = F.doc(db, "posts", p.id, "likes", me.uid);
+        var ls = await F.getDoc(likeRef);
+        if (ls.exists()) {
+          await F.deleteDoc(likeRef);
+          p.likeCount = Math.max(0, (Number(p.likeCount) || 1) - 1);
+          btn.classList.remove("on");
+        } else {
+          await F.setDoc(likeRef, { at: Date.now() });
+          p.likeCount = (Number(p.likeCount) || 0) + 1;
+          btn.classList.add("on");
+        }
+        await F.setDoc(F.doc(db, "posts", p.id), { likeCount: p.likeCount }, { merge: true });
+        btn.querySelector("span").textContent = p.likeCount;
+      } catch (e) { ui.toast("Couldn't like", "Try again"); }
+      btn.disabled = false;
+    });
+    if (me) F.getDoc(F.doc(db, "posts", p.id, "likes", me.uid)).then(function (l) {
+      if (l.exists()) { var b = el.querySelector('[data-a="like"]'); if (b) b.classList.add("on"); }
+    }).catch(function () {});
+
+    var cform = el.querySelector('[data-a="cform"]'), clist = el.querySelector('[data-a="clist"]');
+    el.querySelector('[data-a="comments"]').addEventListener("click", function () {
+      var open = cform.style.display !== "none";
+      cform.style.display = open ? "none" : "flex";
+      clist.style.display = open ? "none" : "flex";
+      if (!open) loadComments(p.id, clist);
+    });
+    cform.querySelector("button").addEventListener("click", async function () {
+      var input = cform.querySelector("input"), text = input.value.trim().slice(0, 500);
+      if (!text) return;
+      if (!me) return ui.toast("Sign in required", "Sign in to comment");
+      try {
+        var cid = Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+        await F.setDoc(F.doc(db, "posts", p.id, "comments", cid), {
+          uid: me.uid, name: isAdmin ? "Admin" : String(me.displayName || me.email || "User").slice(0, 40),
+          authorRole: isAdmin ? "admin" : "user", text: text, at: Date.now()
+        });
+        input.value = "";
+        loadComments(p.id, clist);
+      } catch (e) { ui.toast("Couldn't comment", "Write denied"); }
+    });
+    cform.querySelector("input").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") cform.querySelector("button").click();
+    });
+
+    el.querySelector('[data-a="report"]').addEventListener("click", function () {
+      if (!me) return ui.toast("Sign in required", "Sign in to report");
+      var reason = (prompt("Why are you reporting this post? (spam / abuse / wrong info)") || "").trim().slice(0, 200);
+      if (!reason) return;
+      F.setDoc(F.doc(db, "post_reports", p.id + "_" + me.uid), { postId: p.id, reason: reason, by: me.uid, at: Date.now() })
+        .then(function () { ui.toast("Reported", "Admins will review this post"); })
+        .catch(function () { ui.toast("Couldn't report", "Try again"); });
+    });
+
+    var del = el.querySelector('[data-a="del"]');
+    if (del) del.addEventListener("click", function () {
+      if (!confirm("Delete this post and its comments?")) return;
+      F.getDocs(F.query(F.collection(db, "posts", p.id, "comments"), F.limit(100))).then(function (cs) {
+        return Promise.all(cs.docs.map(function (d) { return F.deleteDoc(d.ref); }));
+      }).catch(function () {}).then(function () {
+        return F.deleteDoc(F.doc(db, "posts", p.id));
+      }).then(function () { el.remove(); ui.toast("Deleted", "Post removed"); })
+        .catch(function () { ui.toast("Couldn't delete", "Delete denied"); });
+    });
+    return el;
+  }
+
+  function renderPoll(host, p) {
+    host.innerHTML = '<div class="poll-meta">POLL</div><div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem"></div><div data-opts style="display:grid;gap:.4rem"></div><div class="poll-meta" data-total>Loading results…</div>';
+    host.querySelector("div:nth-child(2)").textContent = p.poll.question || "";
+    var optsHost = host.querySelector("[data-opts]");
+    var totalEl = host.querySelector("[data-total]");
+    fb.pollResults(p.id).then(function (res) {
+      var total = res.total || 0;
+      totalEl.textContent = total + " vote" + (total === 1 ? "" : "s") + (res.mine ? " · you voted" : "");
+      optsHost.innerHTML = "";
+      (p.poll.options || []).forEach(function (o) {
+        var n = (res.counts && res.counts[o.id]) || 0;
+        var pct = total ? Math.round(n / total * 100) : 0;
+        var b = document.createElement("button");
+        b.className = "poll-opt" + (res.mine === o.id ? " sel" : "");
+        b.type = "button";
+        b.innerHTML = '<span class="fill" style="width:' + pct + '%"></span><span class="lbl"><span></span><span>' + pct + '%</span></span>';
+        b.querySelector(".lbl span").textContent = o.text;
+        b.addEventListener("click", async function () {
+          if (!me) return ui.toast("Sign in required", "Sign in to vote");
+          if (p.poll.endsAt && Date.now() > p.poll.endsAt) return ui.toast("Poll closed", "");
+          b.disabled = true;
+          try {
+            await fb.votePoll(p.id, o.id);
+            renderPoll(host, p);
+          } catch (e) { ui.toast("Couldn't vote", "Try again"); b.disabled = false; }
+        });
+        optsHost.appendChild(b);
+      });
+    }).catch(function () { totalEl.textContent = "Results unavailable"; });
+  }
+
+  function loadComments(postId, clist) {
+    clist.innerHTML = '<div class="muted" style="font-size:.75rem">Loading…</div>';
+    F.getDocs(F.query(F.collection(db, "posts", postId, "comments"), F.orderBy("at", "asc"), F.limit(40))).then(function (snap) {
+      clist.innerHTML = "";
+      if (snap.empty) { clist.innerHTML = '<div class="muted" style="font-size:.75rem">No comments yet.</div>'; return; }
+      snap.forEach(function (d) {
+        var c = d.data() || {}, adminC = c.authorRole === "admin";
+        var row = document.createElement("div");
+        row.className = "bubble-row" + (me && c.uid === me.uid ? " mine" : "") + (adminC ? " admin" : "");
+        row.innerHTML = '<div class="bubble"><span class="who"></span><span class="ct"></span></div>';
+        row.querySelector(".who").textContent = adminC ? "Admin" : (c.name || "User");
+        row.querySelector(".ct").textContent = c.text || "";
+        clist.appendChild(row);
+      });
+    }).catch(function () { clist.innerHTML = '<div class="muted" style="font-size:.75rem">Couldn\'t load comments.</div>'; });
+  }
+
+  document.querySelectorAll("#feed-tabs [data-tab]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      tab = b.dataset.tab;
+      document.querySelectorAll("#feed-tabs [data-tab]").forEach(function (x) {
+        x.classList.toggle("on", x === b);
+        x.setAttribute("aria-selected", x === b ? "true" : "false");
+      });
+      renderFeed();
+    });
+  });
+})();
+</script>
+</body>
+</html>
