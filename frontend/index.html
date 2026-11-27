@@ -8,8 +8,21 @@
 <meta name="description" content="Curated batches, free first lectures, live classes and notes. Learn calmly with StudiKitEZ." />
 <meta name="sk-backend" content="https://studikites.vercel.app" />
 <meta name="theme-color" content="#090909" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="StudiKitEZ" />
+<meta property="og:title" content="StudiKitEZ — Your next lesson, without the noise." />
+<meta property="og:description" content="Find a course, pick up a lesson, and keep your notes and progress together." />
+<meta property="og:image" content="https://dylnd2lqy6eys.cloudfront.net/1770981347/admin_v2/uploads/courses/thumbnail/7275359_125_abhay%2010th%20banner%20app%202026.png" />
+<meta property="og:image:alt" content="Featured 10th Abhay Batch course artwork" />
+<meta property="og:url" content="https://studikitesz.pages.dev/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="StudiKitEZ — Your next lesson, without the noise." />
+<meta name="twitter:description" content="Find a course, pick up a lesson, and keep your notes and progress together." />
+<meta name="twitter:image" content="https://dylnd2lqy6eys.cloudfront.net/1770981347/admin_v2/uploads/courses/thumbnail/7275359_125_abhay%2010th%20banner%20app%202026.png" />
+<link rel="canonical" href="https://studikitesz.pages.dev/" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<script src="assets/js/theme.js"></script>
 <link rel="stylesheet" href="assets/css/main.css" />
 <style>
   #main { padding-top:1.15rem; }
@@ -27,10 +40,17 @@
   .hero .hero-stats > div { min-width:5.5rem; }
   .hero .hero-stats b { font-size:1.15rem; }
   .hero .hero-stats span { display:block; max-width:8rem; line-height:1.4; }
-  .hero-card { display:block; padding:0; transform:none; animation:none; overflow:hidden; border-radius:17px; box-shadow:none; color:var(--ink); text-decoration:none; transition:border-color .2s, transform .2s; }
+  .hero-featured { position:relative; min-width:0; padding:.2rem .55rem .65rem .1rem; }
+  .hero-card { position:relative; z-index:0; isolation:isolate; display:block; padding:0; margin:.1rem .2rem .2rem .1rem; transform:none; animation:none; overflow:visible; border-radius:17px; box-shadow:none; color:var(--ink); text-decoration:none; transition:border-color .2s, transform .2s; }
+  .hero-card::before, .hero-card::after { content:""; position:absolute; inset:.35rem -.35rem -.35rem .35rem; z-index:-1; border:1px solid var(--line); border-radius:17px; background:var(--surface-2); transform:rotate(2deg); transition:transform .35s ease; }
+  .hero-card::after { inset:.7rem -.65rem -.7rem .65rem; opacity:.7; background:var(--surface-3); transform:rotate(-2.5deg); }
   .hero-card:hover { transform:translateY(-3px); border-color:var(--line-strong); }
+  .hero-card:hover::before { transform:rotate(3deg) translateY(-2px); }
+  .hero-card:hover::after { transform:rotate(-4deg) translateY(-3px); }
+  .hero-card.is-shuffling { animation:hero-card-shuffle .62s cubic-bezier(.2,.8,.2,1); }
+  @keyframes hero-card-shuffle { 20% { opacity:.65; transform:translateX(10px) rotate(2deg) scale(.98); } 55% { opacity:.85; transform:translateX(-8px) rotate(-2deg) scale(.99); } 100% { opacity:1; transform:none; } }
   .hero-art { position:relative; aspect-ratio:1.22; overflow:hidden; background:#0b0b0b; }
-  .hero-art img { width:100%; height:100%; object-fit:cover; filter:grayscale(1); opacity:.82; }
+  .hero-art img { width:100%; height:100%; object-fit:cover; filter:none; opacity:1; }
   .hero-art::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.03) 20%,rgba(0,0,0,.62)); pointer-events:none; }
   .hero-art-label { position:absolute; z-index:1; top:1rem; left:1rem; color:#fff; font:600 .65rem var(--mono); letter-spacing:.14em; text-transform:uppercase; }
   .hero-art-number { position:absolute; z-index:1; right:.8rem; bottom:-1.55rem; color:rgba(255,255,255,.82); font:800 clamp(5rem,12vw,9rem)/1 var(--font-display); letter-spacing:-.1em; }
@@ -39,6 +59,9 @@
   .hero-card-info h2 { margin:0; font-size:1.12rem; letter-spacing:-.025em; }
   .hero-card-info p { margin:.4rem 0 .7rem; font-size:.78rem; line-height:1.5; }
   .hero-card-link { display:inline-flex; gap:.4rem; align-items:center; color:var(--ink); font-size:.78rem; font-weight:700; }
+  .hero-controls { display:flex; justify-content:space-between; align-items:center; padding:.55rem .1rem 0; color:var(--muted); font:600 .68rem var(--mono); }
+  .hero-next { border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--ink); padding:.35rem .65rem; font:600 .68rem var(--font); cursor:pointer; }
+  .hero-next:hover { background:var(--surface-2); }
   .feature-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.65rem; margin-top:1.5rem; }
   .feature { display:flex; gap:.7rem; align-items:flex-start; background:transparent; border:1px solid var(--line); border-radius:12px; padding:.85rem; }
   .feature b { font-size:.8rem; display:block; }
@@ -59,7 +82,7 @@
   .bcard .meta { letter-spacing:.1em; }
   .bcard .body > div[style*="display:flex"] { gap:.4rem !important; }
   .bcard .btn { flex:1; }
-  .badge-free, .badge-new { border:1px solid rgba(255,255,255,.6); }
+  .ribbon .badge-free, .ribbon .badge-new { max-width:100%; padding:.14rem .38rem; font-size:.56rem; white-space:nowrap; }
   .site-footer { margin-top:3rem; }
   @media (max-width:860px) {
     .hero-split { grid-template-columns:minmax(0,1fr) minmax(15rem,.8fr); gap:1.2rem; }
@@ -77,6 +100,8 @@
     .hero .hero-stats { gap:1rem; justify-content:space-between; }
     .hero .hero-stats > div { min-width:0; }
     .hero-card { display:grid; grid-template-columns:.95fr 1.05fr; align-items:stretch; }
+    .hero-card::before, .hero-card::after { inset:.25rem -.18rem -.25rem .18rem; }
+    .hero-card::after { inset:.5rem -.32rem -.5rem .32rem; }
     .hero-art { min-height:9rem; aspect-ratio:auto; }
     .hero-art-number { font-size:5rem; }
     .hero-card-info { padding:.8rem; }
@@ -132,19 +157,25 @@
         <div class="hero-actions"><button class="btn btn-primary" id="hero-start">Browse courses</button></div>
         <div class="hero-stats"><div><b id="n-batches">—</b><span>curated batches</span></div><div><b>First</b><span>lecture is free</span></div><div><b>On your time</b><span>learn at your pace</span></div></div>
       </div>
-      <a class="hero-card" id="hero-card" href="#catalog" aria-label="Explore the featured course">
-        <div class="hero-art">
-          <img alt="" id="hero-img" />
-          <span class="hero-art-label">A place to begin</span>
-          <span class="hero-art-number" aria-hidden="true">01</span>
+      <div class="hero-featured">
+        <a class="hero-card" id="hero-card" href="#catalog" aria-label="Explore the featured course">
+          <div class="hero-art">
+            <img alt="" id="hero-img" />
+            <span class="hero-art-label" id="hero-art-label">A place to begin</span>
+            <span class="hero-art-number" id="hero-art-number" aria-hidden="true">01</span>
+          </div>
+          <div class="hero-card-info">
+            <div class="meta" id="hero-tag">FEATURED BATCH</div>
+            <h2 id="hero-title">Find your starting point</h2>
+            <p id="hero-description">Browse the catalog and choose what you want to learn next.</p>
+            <span class="hero-card-link">Explore course <span aria-hidden="true">→</span></span>
+          </div>
+        </a>
+        <div class="hero-controls">
+          <span id="hero-count" aria-live="polite">01 / 01</span>
+          <button class="hero-next" id="hero-next" type="button" aria-label="Show next featured course">Next course →</button>
         </div>
-        <div class="hero-card-info">
-          <div class="meta">FEATURED BATCH</div>
-          <h2 id="hero-title">Find your starting point</h2>
-          <p id="hero-description">Browse the catalog and choose what you want to learn next.</p>
-          <span class="hero-card-link">Explore course <span aria-hidden="true">→</span></span>
-        </div>
-      </a>
+      </div>
     </div>
     <div class="feature-strip">
       <div class="feature"><span class="feature-mark">01</span><div><b>Video lessons</b><span class="muted">Resume with clear playback controls</span></div></div>
@@ -208,14 +239,44 @@
     try { seen = JSON.parse(localStorage.getItem("sk_seen_batches") || "[]"); } catch (e) {}
     all.forEach(function (b) { b.fresh = seen.indexOf(b.id) < 0; });
     try { localStorage.setItem("sk_seen_batches", JSON.stringify(all.map(function (b) { return b.id; }))); } catch (e) {}
-    var hero = all[0];
-    if (hero) {
-      document.getElementById("hero-img").src = hero.thumbnail;
-      document.getElementById("hero-title").textContent = hero.title;
-      document.getElementById("hero-description").textContent = "A curated course with lessons, notes and a free first lecture.";
-      document.getElementById("hero-card").href = ui.courseUrl(hero.title, hero.id);
-      document.getElementById("hero-card").setAttribute("aria-label", "Explore " + hero.title);
-      document.getElementById("hero-img").onerror = function () { this.style.display = "none"; };
+    var starIndex = all.findIndex(function (b) { return String(b.id) === "264"; });
+    if (starIndex < 0) starIndex = all.findIndex(function (b) { return /abhay/i.test(b.title) && /10th|class\s*10/i.test(b.title); });
+    var featured = starIndex < 0 ? all.slice() : [all[starIndex]].concat(all.slice(0, starIndex), all.slice(starIndex + 1));
+    var featuredIndex = 0, heroCard = document.getElementById("hero-card"), heroImage = document.getElementById("hero-img");
+    var heroFeatured = document.querySelector(".hero-featured");
+    function showFeatured(index, animate) {
+      if (!featured.length) return;
+      featuredIndex = (index + featured.length) % featured.length;
+      var batch = featured[featuredIndex], isStar = String(batch.id) === "264" || (/abhay/i.test(batch.title) && /10th|class\s*10/i.test(batch.title));
+      if (animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        heroCard.classList.remove("is-shuffling");
+        void heroCard.offsetWidth;
+        heroCard.classList.add("is-shuffling");
+      }
+      document.getElementById("hero-title").textContent = batch.title;
+      document.getElementById("hero-description").textContent = isStar
+        ? "Our featured class 10 batch. Explore lessons, notes and live sessions."
+        : "A curated course with lessons, notes and a free first lecture.";
+      document.getElementById("hero-tag").textContent = isStar ? "STAR BATCH" : "FEATURED BATCH";
+      document.getElementById("hero-art-label").textContent = isStar ? "StudiKitEZ · Class 10" : "A place to begin";
+      document.getElementById("hero-art-number").textContent = String(featuredIndex + 1).padStart(2, "0");
+      heroCard.href = ui.courseUrl(batch.title, batch.id);
+      heroCard.setAttribute("aria-label", "Explore " + batch.title);
+      heroImage.alt = batch.title;
+      heroImage.style.display = "";
+      heroImage.onerror = function () { this.style.display = "none"; };
+      heroImage.src = batch.thumbnail;
+      document.getElementById("hero-count").textContent =
+        String(featuredIndex + 1).padStart(2, "0") + " / " + String(featured.length).padStart(2, "0");
+    }
+    document.getElementById("hero-next").addEventListener("click", function () { showFeatured(featuredIndex + 1, true); });
+    showFeatured(0, false);
+    if (featured.length > 1) {
+      window.setInterval(function () {
+        if (document.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          || heroFeatured.matches(":hover") || heroFeatured.contains(document.activeElement)) return;
+        showFeatured(featuredIndex + 1, true);
+      }, 9000);
     }
     render();
     ui.load(false);
@@ -244,7 +305,7 @@
       card.className = "bcard reveal";
       card.style.setProperty("--d", Math.min(i * .035, .35) + "s");
       var isEn = en.indexOf(b.id) >= 0;
-      card.innerHTML = '<div class="thumb"><span class="play-orb" aria-hidden="true">▶</span><span class="ribbon"><span class="badge-free">FREE FIRST LECTURE</span>' + (b.fresh ? '<span class="badge-new">NEW</span>' : "") + '</span><img loading="lazy" alt="" /></div>' +
+      card.innerHTML = '<div class="thumb"><span class="play-orb" aria-hidden="true">▶</span><span class="ribbon"><span class="badge-free" title="First lecture is free">FREE</span>' + (b.fresh ? '<span class="badge-new">NEW</span>' : "") + '</span><img loading="lazy" alt="" /></div>' +
         '<div class="body"><div class="meta">CURATED COURSE</div><h3></h3>' +
         '<div class="mono muted" style="font-size:.66rem">Video + PDF notes · live classes</div>' +
         '<div style="display:flex;gap:.5rem;margin-top:auto;padding-top:.5rem"><button class="btn btn-secondary btn-sm" data-a="enroll" style="flex:1">' + (isEn ? "Saved" : "+ Save") + '</button><a class="btn btn-primary btn-sm" style="flex:1" href="' + ui.esc(ui.courseUrl(b.title, b.id)) + '">View course</a></div></div>';

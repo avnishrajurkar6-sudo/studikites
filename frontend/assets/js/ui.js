@@ -226,6 +226,7 @@ window.SK.ui = (function () {
     host.setAttribute("data-auth-user", authKey);
     if (!u) {
       host.innerHTML = '<a class="btn btn-primary btn-sm" href="login.html?next=' + encodeURIComponent(nextTarget()) + '">Sign in</a>';
+      mountThemeToggle();
       return;
     }
     shellUser = u;
@@ -240,6 +241,7 @@ window.SK.ui = (function () {
       '<a href="onboarding.html?edit=1" role="menuitem">My batches</a>' +
       '<div class="sep"></div>' +
       '<button id="av-out" role="menuitem">↪ Sign out</button></div></div>';
+    mountThemeToggle();
     var btn = host.querySelector("#av-btn"), pop = host.querySelector("#av-pop");
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
@@ -381,7 +383,7 @@ window.SK.ui = (function () {
   var bellBadge = 0;
   function mountBell() {
     if (document.getElementById("notice-bell") || isAuthPage()) return;
-    var host = document.querySelector(".nav-actions") || document.getElementById("auth-area");
+    var host = document.querySelector(".nav-actions") || document.getElementById("auth-area") || document.querySelector(".site-header .nav-inner");
     if (!host) return;
     var wrap = document.createElement("div");
     wrap.className = "bell-wrap";
@@ -1028,7 +1030,13 @@ window.SK.ui = (function () {
     if (!host) return;
     var b = document.createElement("button");
     b.id = "theme-toggle"; b.className = "theme-toggle"; b.type = "button";
-    function sync() { b.textContent = currentTheme() === "dark" ? "Light" : "Dark"; b.setAttribute("aria-label", "Switch to " + (currentTheme() === "dark" ? "light" : "dark") + " theme"); }
+    function sync() {
+      var theme = currentTheme();
+      b.textContent = theme === "dark" ? "Light" : "Dark";
+      b.setAttribute("aria-label", "Switch to " + (theme === "dark" ? "light" : "dark") + " theme");
+      b.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+      b.title = "Switch to " + (theme === "dark" ? "light" : "dark") + " theme";
+    }
     b.addEventListener("click", function () { toggleTheme(); sync(); });
     document.addEventListener("theme-change", sync);
     sync();
@@ -1046,6 +1054,8 @@ window.SK.ui = (function () {
     if (t === "dark" || t === "light") {
       document.documentElement.setAttribute("data-theme", t);
       try { localStorage.setItem("sk_theme", t); } catch (e) {}
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", t === "dark" ? "#090909" : "#ffffff");
     } else {
       document.documentElement.removeAttribute("data-theme");
       try { localStorage.removeItem("sk_theme"); } catch (e) {}

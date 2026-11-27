@@ -13,11 +13,10 @@
   window.__SK__.telegramUrl = "https://t.me/Studikitesbot";
   window.__SK__.brand = "AVkings";
 
-  /* Theme: saved choice overrides system; default light on a white base. */
+  /* Keep the early theme choice in place; theme.js sets it before styles load. */
   try {
     var savedTheme = localStorage.getItem("sk_theme");
     if (savedTheme === "dark" || savedTheme === "light") document.documentElement.setAttribute("data-theme", savedTheme);
-    else document.documentElement.removeAttribute("data-theme");
   } catch (e) {}
 
   /* AVkings favicon — inline SVG so it works offline and on every page. */
