@@ -7,7 +7,7 @@
 <title>Set up your space — StudiKitEZ</title>
 <meta name="generator" content="AVkings Engine" />
 <meta name="description" content="Pick your batches and set your learning rhythm." />
-<meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="sk-backend" content="https://studikitesz.avnishrajurkar6.workers.dev" />
 <meta name="theme-color" content="#090909" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -51,6 +51,9 @@
       <p>Three quick steps and your learning space is ready. First lecture of every batch is free.</p>
       <label class="field" for="ob-name">What should we call you?</label>
       <input class="input" id="ob-name" maxlength="40" placeholder="Your name" autocomplete="name" style="max-width:24rem" />
+      <label class="field" for="ob-contact-mobile">Contact mobile number (India)</label>
+      <input class="input mono" id="ob-contact-mobile" type="tel" inputmode="numeric" maxlength="14" placeholder="98765 43210" autocomplete="tel-national" style="max-width:24rem" />
+      <p class="mono muted" style="font-size:.64rem;margin:.35rem 0 0">Required for your profile. This contact number does not change your sign-in number.</p>
       <div class="ob-goal" id="goals" style="margin-top:1.2rem" role="group" aria-label="Your goal">
         <button type="button" class="goal-tile on" data-goal="board"><span class="goal-number">01</span><span>Board exams</span></button>
         <button type="button" class="goal-tile" data-goal="school"><span class="goal-number">02</span><span>School</span></button>
@@ -111,22 +114,29 @@
   ui.boot({ onboarding: true, status: "Preparing your space…" }).then(function (r) {
     user = r.user;
     if (!user) { location.replace("login.html?next=" + encodeURIComponent("onboarding.html" + location.search)); return; }
-    if (editing) {
-      fb.userDoc(user.uid).then(function (d) {
-        var o = (d && d.onboarding) || {};
-        selected = (o.batches || []).map(String);
-        var name = d && (d.displayName || d.name);
-        if (name) document.getElementById("ob-name").value = String(name).replace(/^\+91\s*/, "");
+    fb.userDoc(user.uid).then(function (d) {
+        d = d || {};
+        var o = d.onboarding || {};
+        var name = d.displayName || d.name || (user.provider !== "phone" ? user.displayName : "");
+        var contactMobile = d.contactMobile || d.mobile || user.mobile || "";
+        if (name) document.getElementById("ob-name").value = String(name).replace(/^\+91\s*/, "").slice(0, 40);
+        if (contactMobile) document.getElementById("ob-contact-mobile").value = String(contactMobile).replace(/\D/g, "").slice(-10);
+        if (editing || o.done !== true) selected = (o.batches || []).map(String);
         if (o.goal) { goal = o.goal; markGoal(); }
         if (o.dailyMinutes) document.getElementById("ob-mins").value = o.dailyMinutes;
         if (o.level) document.getElementById("ob-level").value = o.level;
         document.getElementById("ob-remind").checked = o.reminders !== false;
-        document.getElementById("ob-finish").textContent = "Save changes ✓";
-      }).catch(function () {});
-    }
+        if (editing) document.getElementById("ob-finish").textContent = "Save changes";
+      }).catch(function (error) {
+        ui.toast("Profile unavailable", error && error.message ? error.message : "Reconnect and retry onboarding");
+      });
     if (typeof fb.presenceBeat === "function") Promise.resolve(fb.presenceBeat("onboarding", "setting up")).catch(function () {});
   }).catch(function () {});
 
+  var contactMobileInput = document.getElementById("ob-contact-mobile");
+  contactMobileInput.addEventListener("input", function () {
+    this.value = this.value.replace(/\D/g, "").slice(-10);
+  });
   function markGoal() {
     document.querySelectorAll("#goals .goal-tile").forEach(function (t) { t.classList.toggle("on", t.dataset.goal === goal); });
   }
@@ -139,7 +149,22 @@
     document.querySelectorAll("#dots span").forEach(function (d, i) { d.classList.toggle("on", i <= n); });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  document.getElementById("ob-next1").addEventListener("click", function () { go(1); });
+  document.getElementById("ob-next1").addEventListener("click", function () {
+    var name = document.getElementById("ob-name").value.trim();
+    var mobile = api.validMobile(contactMobileInput.value);
+    if (name.length < 2) {
+      ui.toast("Add your name", "Enter at least 2 characters to continue");
+      document.getElementById("ob-name").focus();
+      return;
+    }
+    if (!mobile) {
+      ui.toast("Add a contact number", "Enter a valid 10-digit Indian mobile number");
+      contactMobileInput.focus();
+      return;
+    }
+    contactMobileInput.value = mobile;
+    go(1);
+  });
   document.getElementById("ob-back1").addEventListener("click", function () { go(0); });
   document.getElementById("ob-back2").addEventListener("click", function () { go(1); });
 
@@ -187,15 +212,27 @@
   document.getElementById("ob-finish").addEventListener("click", async function () {
     if (!user) { location.href = "login.html?next=" + encodeURIComponent("onboarding.html"); return; }
     var name = document.getElementById("ob-name").value.trim().slice(0, 40);
-    if (name) {
-      try {
-        await fb.ensure();
-        var S = fb.raw().S, ref = S._fs.doc(S.sDb, "users", user.uid);
-        var snap = await S._fs.getDoc(ref);
-        if (!(snap.exists() && snap.data().displayName)) await S._fs.setDoc(ref, { displayName: name, name: name }, { merge: true });
-      } catch (e) {}
+    var contactMobile = api.validMobile(contactMobileInput.value);
+    if (name.length < 2) {
+      ui.toast("Add your name", "Enter at least 2 characters to finish");
+      go(0);
+      document.getElementById("ob-name").focus();
+      return;
+    }
+    if (!contactMobile) {
+      ui.toast("Add a contact number", "Enter a valid 10-digit Indian mobile number");
+      go(0);
+      contactMobileInput.focus();
+      return;
+    }
+    if (!selected.length) {
+      ui.toast("Pick a batch", "Choose at least one batch to finish onboarding");
+      go(1);
+      return;
     }
     var payload = {
+      displayName: name,
+      contactMobile: contactMobile,
       batches: selected,
       goal: goal,
       dailyMinutes: Number(document.getElementById("ob-mins").value) || 30,

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "studikitesz",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "triggers": { "crons": ["17 3 * * *"] },
+  "vars": {
+    "FIREBASE_STUDIKI_PROJECT_ID": "studiki",
+    "SITE_URL": "https://studikitesz.pages.dev",
+    "ALLOWED_ORIGINS": "https://studikitesz.pages.dev,https://studikitesz.avnishrajurkar6.workers.dev,http://localhost:8090,http://localhost:8787"
+  }
+}

@@ -6,7 +6,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23111827%27/%3E%3Cpath d=%27M14 18h9l9 22 9-22h9L38 50h-12L14 18z%27 fill=%27white%27/%3E%3C/svg%3E" />
 <title>Dashboard — StudiKitEZ</title>
 <meta name="description" content="Your learning home: progress, streaks, new lessons and the community lounge." />
-<meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="sk-backend" content="https://studikitesz.avnishrajurkar6.workers.dev" />
 <meta name="theme-color" content="#090909" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,7 +35,7 @@
   <div class="nav-inner">
     <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="index.html">Catalog</a><a href="dashboard.html" class="on">Dashboard</a>
+      <a href="index.html?browse=1">Catalog</a><a href="dashboard.html" class="on">Dashboard</a>
       <a href="posts.html">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
     </nav>
     <span class="nav-spacer"></span>
@@ -43,7 +43,7 @@
     <button class="iconbtn menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
   </div>
   <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
-    <a href="index.html">Catalog</a><a href="dashboard.html" class="on">Dashboard</a>
+    <a href="index.html?browse=1">Catalog</a><a href="dashboard.html" class="on">Dashboard</a>
     <a href="posts.html">Community</a><a href="msgs.html">Messages</a><a href="focus.html">Focus Rooms</a>
     <a href="onboarding.html?edit=1">My batches</a>
   </nav>
@@ -96,6 +96,20 @@
       <h3 style="font-size:.95rem;margin:.3rem 0 .1rem">Top learners</h3>
       <p class="sub" style="margin:0 0 .4rem">XP earned from finished lessons.</p>
       <div id="leaderboard"><span class="muted" style="font-size:.78rem">Loading…</span></div>
+      <div class="divider"></div>
+      <span class="kicker">Your leaderboard profile</span>
+      <p class="sub" style="margin:.2rem 0 .55rem">Choose the name others see, or hide yourself from rankings.</p>
+      <label class="field" for="leader-name">Display name</label>
+      <input class="input" id="leader-name" maxlength="40" autocomplete="nickname" placeholder="Your name" />
+      <label class="switch" style="display:flex;align-items:center;gap:.55rem;margin-top:.55rem;cursor:pointer">
+        <input type="checkbox" id="leader-hidden" />
+        <span style="font-size:.82rem;font-weight:700">Hide me from the leaderboard</span>
+      </label>
+      <p class="mono muted" style="font-size:.62rem;line-height:1.5;margin:.5rem 0">
+        Keep your name kind and respectful. Inappropriate names may lead to immediate leaderboard suspension.
+      </p>
+      <div id="leader-status" class="mono muted" style="font-size:.68rem;min-height:1em"></div>
+      <button class="btn btn-secondary btn-sm btn-block" id="leader-save" type="button">Save leaderboard profile</button>
     </section>
 
     <section class="panel span-5 reveal" aria-labelledby="new-title">
@@ -251,8 +265,18 @@
 
   async function leaderboard() {
     var host = document.getElementById("leaderboard");
+    var profile = await fb.userDoc(user.uid).catch(function () { return null; });
+    var nameField = document.getElementById("leader-name");
+    var hiddenField = document.getElementById("leader-hidden");
+    if (profile) {
+      if (!nameField.value) nameField.value = String(profile.displayName || profile.name || user.displayName || "").replace(/^\+91\s*/, "").slice(0, 40);
+      hiddenField.checked = profile.leaderboardHidden === true;
+      if (profile.leaderboardSuspended === true) {
+        document.getElementById("leader-status").textContent = "Your leaderboard access is suspended. Contact support if you think this is a mistake.";
+      }
+    }
     var rows = await fb.leaderboard(40).catch(function () { return []; });
-    if (!rows.length) { host.innerHTML = '<span class="muted" style="font-size:.78rem">Finish a lesson to appear here.</span>'; return; }
+    if (!rows.length) { host.innerHTML = '<span class="muted" style="font-size:.78rem">No public rankings yet. Finish a lesson to earn XP.</span>'; return; }
     var myIdx = -1;
     rows.forEach(function (r, i) { if (r.uid === user.uid) myIdx = i; });
     var show = rows.slice(0, 6);
@@ -268,6 +292,28 @@
       host.appendChild(el);
     });
   }
+  document.getElementById("leader-save").addEventListener("click", async function () {
+    var name = document.getElementById("leader-name").value.trim().replace(/\s+/g, " ");
+    var status = document.getElementById("leader-status");
+    if (name.length < 2) {
+      status.textContent = "Enter a display name with at least 2 characters.";
+      document.getElementById("leader-name").focus();
+      return;
+    }
+    var button = this;
+    button.disabled = true;
+    status.textContent = "Saving…";
+    try {
+      await fb.saveLeaderboardProfile(name, document.getElementById("leader-hidden").checked);
+      user.displayName = name;
+      status.textContent = "Leaderboard profile saved.";
+      await leaderboard();
+    } catch (error) {
+      status.textContent = error && error.message ? error.message : "Could not save your leaderboard profile.";
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   async function newLessons(picked) {
     var host = document.getElementById("new-lessons");

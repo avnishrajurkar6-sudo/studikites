@@ -143,6 +143,14 @@ window.SK.fb = (function () {
   async function saveProfile(mobile, name, email) {
     await window.SK.api.phoneProfile("save-profile", { name: name, email: email });
   }
+  async function saveLeaderboardProfile(displayName, hidden) {
+    var result = await window.SK.api.updateLeaderboardProfile({ displayName: displayName, hidden: hidden });
+    var authUser = S.sAuth && S.sAuth.currentUser;
+    if (authUser && S._auth && S._auth.updateProfile) {
+      await S._auth.updateProfile(authUser, { displayName: result.displayName }).catch(function () {});
+    }
+    return result;
+  }
   async function checkPhone(mobile) {
     var profile = await userDoc("phone_" + mobile);
     if (!profile) return { exists: false, hasName: false };
@@ -156,20 +164,16 @@ window.SK.fb = (function () {
   async function prefs(uid, force) {
     if (!uid) return false;
     var ck = "sk_prefs_" + uid;
-    if (!force) {
-      try { var raw = sessionStorage.getItem(ck); if (raw) return JSON.parse(raw); } catch (e) {}
-    }
     try {
       var d = await userDoc(uid);
       var o = d && d.onboarding;
-      var out = (o && o.done === true) ? o : false;
-      /* Firestore write may have failed while offline — never trap the learner
-         in an onboarding redirect loop when their device already has the data. */
-      if (!out) {
-        try {
-          if (localStorage.getItem("sk_onboarded_uid") === uid) out = { done: true, batches: myBatches(), offline: true };
-        } catch (e2) {}
-      }
+      var hasName = String(d && (d.displayName || d.name) || "").trim().length >= 2;
+      var hasBatch = !!(o && Array.isArray(o.batches) && o.batches.some(function (id) { return String(id || "").trim(); }));
+      /* Compulsory: onboarding.done + name(>=2) + contactMobile(10-digit Indian) + at least one batch. */
+      var contactRaw = String((d && (d.contactMobile || (o && o.contactMobile))) || "").replace(/\D/g, "");
+      var contactDigits = contactRaw.length >= 10 ? contactRaw.slice(-10) : contactRaw;
+      var hasContact = /^[6-9]\d{9}$/.test(contactDigits);
+      var out = (o && o.done === true && hasName && hasBatch && hasContact) ? o : false;
       try { sessionStorage.setItem(ck, JSON.stringify(out)); } catch (e) {}
       return out;
     } catch (e) {
@@ -184,7 +188,12 @@ window.SK.fb = (function () {
   }
   async function saveOnboarding(uid, data) {
     data = data || {};
+    var displayName = String(data.displayName || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    var contactMobile = String(data.contactMobile || "").replace(/\D/g, "").slice(-10);
     var list = (data.batches || []).map(function (x) { return String(x); }).filter(Boolean).slice(0, 12);
+    if (displayName.length < 2) throw new Error("Enter your name to finish onboarding");
+    if (!/^[6-9]\d{9}$/.test(contactMobile)) throw new Error("Enter a valid 10-digit Indian contact number");
+    if (!list.length) throw new Error("Choose at least one batch to finish onboarding");
     var payload = {
       done: true,
       batches: list,
@@ -193,14 +202,21 @@ window.SK.fb = (function () {
       dailyMinutes: Math.max(10, Math.min(240, Number(data.dailyMinutes) || 30)),
       reminders: data.reminders !== false,
       level: String(data.level || "").slice(0, 40),
+      contactMobile: contactMobile,
       updatedAt: Date.now()
     };
     var phone = phoneLocal();
     if (phone && phone.uid === uid) {
-      await window.SK.api.phoneProfile("save-onboarding", { data: payload });
+      await window.SK.api.phoneProfile("save-onboarding", { data: payload, displayName: displayName });
     } else {
       await ensure();
-      await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid), { onboarding: payload, updatedAt: Date.now() }, { merge: true });
+      await S._fs.setDoc(S._fs.doc(S.sDb, "users", uid), {
+        displayName: displayName, name: displayName, contactMobile: contactMobile,
+        onboarding: payload, updatedAt: Date.now()
+      }, { merge: true });
+      if (S.sAuth && S.sAuth.currentUser && S._auth.updateProfile) {
+        await S._auth.updateProfile(S.sAuth.currentUser, { displayName: displayName }).catch(function () {});
+      }
     }
     try {
       localStorage.setItem("sk_onboarded_uid", uid);
@@ -1041,10 +1057,13 @@ window.SK.fb = (function () {
           uid: d.id,
           name: String(v.displayName || v.name || (v.mobile ? "+91 " + v.mobile : "") || "Learner").replace(/^\+91\s*/, "").slice(0, 40),
           xp: Number(g.xp) || 0,
-          streak: Number(st.current) || 0
+          streak: Number(st.current) || 0,
+          hidden: v.leaderboardHidden === true,
+          suspended: v.leaderboardSuspended === true,
+          role: String(v.role || "user")
         });
       });
-      return out;
+      return out.filter(function (row) { return !row.hidden && !row.suspended; });
     } catch (e) { return []; }
   }
   /* A tiny "study pulse" summary — total actions and consecutive days. */
@@ -1190,7 +1209,7 @@ window.SK.fb = (function () {
     forceList: forceList, watchForceList: watchForceList, forcePollOf: forcePollOf, voteForcePoll: voteForcePoll, forcePollResults: forcePollResults,
     createNotice: createNotice, noticesAll: noticesAll, setNoticeActive: setNoticeActive, deleteNotice: deleteNotice,
     searchUsers: searchUsers, appLatest: appLatest, appVersions: appVersions, raw: raw,
-    leaderboard: leaderboard, activitySummary: activitySummary,
+    leaderboard: leaderboard, activitySummary: activitySummary, saveLeaderboardProfile: saveLeaderboardProfile,
     createPost: createPost, votePoll: votePoll, pollResults: pollResults, pollOf: pollOf,
     supportThreadId: supportThreadId, sendSupport: sendSupport, supportThreads: supportThreads,
     telegramLink: telegramLink, telegramStatus: telegramStatus

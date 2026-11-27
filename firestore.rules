@@ -17,7 +17,7 @@ service cloud.firestore {
       allow create: if !('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin();
       allow update: if isAdmin()
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-             'displayName', 'name', 'photoURL', 'email', 'mobile', 'provider',
+             'displayName', 'name', 'photoURL', 'email', 'mobile', 'contactMobile', 'provider',
              'onboarding', 'updatedAt', 'lastLoginAt', 'createdAt',
              'activity', 'activityAt', 'gamification', 'prefs',
              'referralFreeUntil', 'telegram', 'telegramVerified', 'telegramId',
@@ -75,6 +75,9 @@ service cloud.firestore {
     match /forceViews/{uid} { allow read, write: if true; }
     match /telegram_links/{token} {
       allow read, write: if false;                 // service account only
+    }
+    match /app_auth_codes/{code} {
+      allow read, write: if false;                 // temporary app auth codes; service account only
     }
     match /app/{ver} { allow read, write: if true; }
     match /contact_messages/{id} { allow read, write: if true; }

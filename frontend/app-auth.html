@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Authorize app — StudiKitEZ</title>
+<meta name="sk-backend" content="https://studikitesz.avnishrajurkar6.workers.dev" />
+<meta name="theme-color" content="#090909" />
+<script src="assets/js/theme.js"></script>
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<div class="onboard-shell"><div class="ob-card" style="max-width:34rem;margin:0 auto;padding:2rem 1rem 6rem">
+  <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
+  <span class="kicker" style="display:block;margin-top:1.4rem">App authorization</span>
+  <h1 style="margin:.4rem 0 .6rem">Authorize <span id="app-name">StudiKitEZ app</span>?</h1>
+  <p class="muted" id="who" style="margin:0 0 1rem">…</p>
+  <p class="muted" style="margin:0 0 1.4rem;font-size:.9rem;line-height:1.5">
+    The app will be able to access your account to verify your session, complete required onboarding,
+    and use features like your leaderboard profile. You can revoke access anytime. A temporary
+    authorization code is generated for <b id="redirect-uri">the app</b>, is single-use, and expires in a few minutes.
+  </p>
+  <div class="ob-actions">
+    <a class="btn btn-ghost" href="dashboard.html">Cancel</a><span class="spacer"></span>
+    <button class="btn btn-primary btn-lg" id="authorize">Authorize</button>
+  </div>
+  <div id="result" style="margin-top:1.6rem"></div>
+</div></div>
+<div id="toast-root" aria-live="polite"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  var ui = SK.ui, fb = SK.fb;
+  var params = new URLSearchParams(location.search);
+  var appId = params.get("app") || "studikitesz";
+  var redirect = params.get("redirect") || "";
+  var state = params.get("state") || "";
+  document.getElementById("app-name").textContent = appId === "studikitesz" ? "StudiKitEZ app" : appId;
+  document.getElementById("redirect-uri").textContent = redirect ? redirect : "a manual code";
+
+  ui.boot({ onboarding: true, status: "Preparing…" }).then(function (r) {
+    var user = r.user;
+    if (!user) { location.replace("login.html?next=" + encodeURIComponent("app-auth.html" + location.search)); return; }
+    document.getElementById("who").textContent = "Signed in as " + (user.displayName || user.email || user.mobile || user.uid);
+  }).catch(function () {});
+
+  document.getElementById("authorize").addEventListener("click", async function () {
+    var btn = this; btn.disabled = true;
+    try {
+      var headers = await fb.authHeaders();
+      headers["Content-Type"] = "application/json";
+      var backend = (window.__SK__ && window.__SK__.backendBaseUrl) || "https://studikitesz.avnishrajurkar6.workers.dev";
+      var resp = await fetch(backend + "/api/auth/app-login", {
+        method: "POST", headers: headers,
+        body: JSON.stringify({ action: "create", app: appId, redirect: redirect, state: state })
+      });
+      var data = await resp.json();
+      if (!resp.ok || !data || !data.code) throw new Error((data && data.error) || "Could not create authorization");
+      var result = document.getElementById("result");
+      var code = data.code;
+      var redirectUrl = data.redirect || "";
+      if (redirectUrl) {
+        // Try to return to the app automatically; also show the code as a fallback.
+        result.innerHTML = '<p class="muted">Returning to the app… If it doesn\'t open, paste this temporary code:</p>' +
+          '<pre style="user-select:all;padding:1rem;border-radius:14px;background:var(--surface-3);word-break:break-all">' + code + '</pre>';
+        try { location.href = redirectUrl; } catch (e) {}
+      } else {
+        result.innerHTML = '<p class="muted">Paste this temporary code in the app. It is single-use and expires in a few minutes:</p>' +
+          '<pre style="user-select:all;padding:1rem;border-radius:14px;background:var(--surface-3);word-break:break-all">' + code + '</pre>';
+      }
+    } catch (e) {
+      ui.toast("Authorization failed", e && e.message ? e.message : "Please try again");
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

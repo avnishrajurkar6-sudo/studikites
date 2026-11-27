@@ -9,7 +9,7 @@
 <meta name="generator" content="AVkings Engine" />
 <meta name="description" content="Sign in with Google or phone OTP." />
 <meta name="robots" content="noindex, nofollow" />
-<meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="sk-backend" content="https://studikitesz.avnishrajurkar6.workers.dev" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <script src="assets/js/theme.js"></script>
@@ -20,7 +20,7 @@
 <header class="site-header">
   <div class="nav-inner">
     <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
-    <nav class="nav-links" aria-label="Primary"><a href="index.html">Catalog</a><a href="app.html">App</a></nav>
+    <nav class="nav-links" aria-label="Primary"><a href="index.html?browse=1">Catalog</a><a href="app.html">App</a></nav>
     <span></span>
   </div>
 </header>
@@ -48,7 +48,7 @@
       <label class="field" for="mobileInput">Mobile number (India)</label>
       <div style="display:flex;gap:.5rem">
         <span style="display:inline-flex;align-items:center;padding:0 .9rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font-weight:800">+91</span>
-        <input id="mobileInput" class="input mono" type="tel" inputmode="numeric" maxlength="10" placeholder="98765 43210" autocomplete="tel" />
+        <input id="mobileInput" class="input mono" type="tel" inputmode="numeric" maxlength="14" placeholder="98765 43210" autocomplete="tel-national" style="flex:1;min-width:0;width:100%" />
       </div>
       <button class="btn btn-primary btn-block" id="sendOtpBtn" style="margin-top:.9rem">Send OTP</button>
     </div>
@@ -115,7 +115,7 @@
     }
     /* First login -> onboarding. Returning user -> their requested page. */
     var onboarded = await fb.prefs(uid, true).catch(function () { return null; });
-    var dest = onboarded === false
+    var dest = !onboarded || onboarded.done !== true
       ? "onboarding.html?next=" + encodeURIComponent(next)
       : next;
     setTimeout(function () { location.replace(dest); }, 450);
@@ -139,6 +139,9 @@
   }
   document.getElementById("sendOtpBtn").addEventListener("click", doSend);
   document.getElementById("resendBtn").addEventListener("click", doSend);
+  document.getElementById("mobileInput").addEventListener("input", function () {
+    this.value = this.value.replace(/\D/g, "").slice(-10);
+  });
   document.getElementById("backBtn").addEventListener("click", function () {
     showStep(1);
     document.getElementById("form-title").textContent = "Welcome back";

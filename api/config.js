@@ -23,7 +23,7 @@ const DEFAULTS = {
     measurementId: "G-X0ZH9VYZ9B",
   },
   SITE_URL: "https://studikitesz.pages.dev",
-  TELEGRAM_URL: "https://t.me/studikitez",
+  TELEGRAM_URL: "https://t.me/studikitesz",
 };
 
 module.exports = async function handler(req, res) {

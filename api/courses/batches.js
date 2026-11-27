@@ -5,8 +5,7 @@
    daily (see vercel.json). */
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
+/* fs/path removed: fallback catalog is bundled JSON (Cloudflare Workers has no fs). */
 
 // ---- Safe module loading ----
 let http, verify;
@@ -18,7 +17,7 @@ catch (e) { http = null; missing.push('lib/http: ' + e.message); }
 try { verify = require('../../lib/verify'); }
 catch (e) { verify = null; missing.push('lib/verify: ' + e.message); }
 
-const FALLBACK_PATH = path.join(__dirname, '..', '..', 'lib', 'batches.json');
+const BUNDLED_FALLBACK = require('../../lib/batches.json');
 const CACHE_MS = 15 * 60 * 1000;
 
 let cache = { at: 0, data: null, source: '' };
@@ -90,10 +89,7 @@ async function requireAdmin(req) {
 
 // ---- Helpers ----
 function fallback() {
-  try {
-    const data = JSON.parse(fs.readFileSync(FALLBACK_PATH, 'utf8'));
-    if (data && Array.isArray(data.new)) return data;
-  } catch { /* ignore */ }
+  if (BUNDLED_FALLBACK && Array.isArray(BUNDLED_FALLBACK.new)) return BUNDLED_FALLBACK;
   return { new: [], old: [] };
 }
 

@@ -1,0 +1,17 @@
+node_modules
+android
+android/**
+my-bot
+my-bot/**
+tgcloud
+tgcloud/**
+tools
+tools/**
+.wrangler
+.vercel
+.env
+.env.*
+.env.local
+*.log
+frontend/node_modules
+.git

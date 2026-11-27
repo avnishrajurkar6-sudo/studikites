@@ -198,17 +198,26 @@ async function writeProfile(uid, current, action, body) {
 
   if (action === 'save-onboarding') {
     const data = body.data && typeof body.data === 'object' ? body.data : {};
+    const displayName = sanitizeText(body.displayName, 40);
+    const contactMobile = String(data.contactMobile || '').replace(/\D/g, '').slice(-10);
+    const batches = Array.isArray(data.batches) ? data.batches.map((id) => sanitizeText(id, 20)).filter(Boolean).slice(0, 12) : [];
+    if (displayName.length < 2) throw Object.assign(new Error('Enter your name to finish onboarding'), { status: 400 });
+    if (!/^[6-9]\d{9}$/.test(contactMobile)) throw Object.assign(new Error('Enter a valid 10-digit Indian contact number'), { status: 400 });
+    if (!batches.length) throw Object.assign(new Error('Choose at least one batch to finish onboarding'), { status: 400 });
     const onboarding = {
       done: true,
-      batches: Array.isArray(data.batches) ? data.batches.map((id) => sanitizeText(id, 20)).filter(Boolean).slice(0, 12) : [],
+      batches,
       mainBatch: sanitizeText(data.mainBatch, 20),
       goal: sanitizeText(data.goal || 'board', 40),
       dailyMinutes: Math.max(10, Math.min(240, Number(data.dailyMinutes) || 30)),
       reminders: data.reminders !== false,
       level: sanitizeText(data.level, 40),
+      contactMobile,
       updatedAt: now,
     };
-    await fsPatchDocument('users', uid, encodeFields({ onboarding, updatedAt: now }), ['onboarding', 'updatedAt']);
+    await fsPatchDocument('users', uid, encodeFields({
+      displayName, name: displayName, contactMobile, onboarding, updatedAt: now,
+    }), ['displayName', 'name', 'contactMobile', 'onboarding', 'updatedAt']);
     return { success: true, onboarding };
   }
 

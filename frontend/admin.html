@@ -8,7 +8,7 @@
 <title>Admin — StudiKitEZ</title>
 <meta name="generator" content="AVkings Engine" />
 <meta name="robots" content="noindex, nofollow" />
-<meta name="sk-backend" content="https://studikites.vercel.app" />
+<meta name="sk-backend" content="https://studikitesz.avnishrajurkar6.workers.dev" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <script src="assets/js/theme.js"></script>
@@ -20,7 +20,7 @@
   <div class="nav-inner">
     <a class="brand" href="index.html"><span class="brand-mark">S</span><span>StudiKitEZ</span></a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="index.html">Catalog</a>
+      <a href="index.html?browse=1">Catalog</a>
       <a href="dashboard.html">Dashboard</a>
       <a href="app.html">App</a>
     </nav>
@@ -30,7 +30,7 @@
     </span>
   </div>
   <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
-    <a href="index.html">Catalog</a>
+    <a href="index.html?browse=1">Catalog</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="app.html">App</a>
   </nav>
@@ -215,7 +215,7 @@
 <script src="assets/js/ui.js"></script>
 <script>
 (function () {
-  var ui = SK.ui, fb = SK.fb;
+  var ui = SK.ui, fb = SK.fb, api = SK.api;
   var F = null, db = null, me = null, users = [], visible = 20, filter = "";
   var presenceTimer = null, forceUnsubscribe = null, target = null, editingId = null;
 
@@ -288,12 +288,35 @@
         "<select class='input' data-a='plan' style='min-height:34px;font-size:.75rem;padding:.2rem .4rem'><option value=''>Plan…</option><option value='trial'>Trial 24h</option><option value='monthly'>Monthly 30d</option><option value='lifetime'>Lifetime</option><option value='__revoke__'>Revoke</option></select>" +
         "<button class='btn btn-secondary btn-sm' data-a='apply'>Set</button>" +
         "<button class='btn btn-ghost btn-sm' data-a='strikes' title='Reset devtools warnings'>" + (u.strikes ? "! " + u.strikes + " reset" : "0 strikes") + "</button>" +
+        "<button class='btn " + (u.leaderboardSuspended ? "btn-secondary" : "btn-ghost") + " btn-sm' data-a='leaderboard'>" + (u.leaderboardSuspended ? "Restore rank" : "Suspend rank") + "</button>" +
         "<button class='btn btn-ghost btn-sm' data-a='msg'>Msg</button>" +
         "</div></td>";
       tr.children[0].children[0].textContent = u.displayName || "(no name)";
       tr.children[0].children[1].textContent = u.email || u.mobile || u.id;
-      tr.children[1].innerHTML = (u.banned ? '<span class="chip bad">banned</span>' : '<span class="chip">ok</span>') + (u.role === "admin" ? ' <span class="chip adm">admin</span>' : "");
+      tr.children[1].innerHTML = (u.banned ? '<span class="chip bad">banned</span>' : '<span class="chip">ok</span>') + (u.role === "admin" ? ' <span class="chip adm">admin</span>' : "") + (u.leaderboardSuspended ? ' <span class="chip bad">leaderboard suspended</span>' : "");
       tr.children[2].innerHTML = subLabel(u);
+      var leaderboardButton = tr.querySelector("[data-a='leaderboard']");
+      if (u.role === "admin") {
+        leaderboardButton.disabled = true;
+        leaderboardButton.title = "Admin accounts cannot be suspended from rankings";
+      } else {
+        leaderboardButton.addEventListener("click", async function () {
+          var nextSuspended = !u.leaderboardSuspended;
+          var label = u.displayName || u.email || u.id;
+          if (nextSuspended && !confirm("Suspend " + label + " from the leaderboard? Their account and course access will remain unchanged.")) return;
+          leaderboardButton.disabled = true;
+          try {
+            await api.suspendLeaderboardUser(u.id, nextSuspended);
+            u.leaderboardSuspended = nextSuspended;
+            ui.toast(nextSuspended ? "Leaderboard suspended" : "Leaderboard restored", label);
+            render();
+          } catch (error) {
+            ui.toast("Update failed", error && error.message ? error.message : "Could not update leaderboard access");
+          } finally {
+            leaderboardButton.disabled = false;
+          }
+        });
+      }
       tr.querySelector("[data-a='ban']").addEventListener("click", function () {
         var to = !u.banned;
         if (to && !confirm("Ban " + (u.email || u.id) + "?")) return;
@@ -336,7 +359,7 @@
       users = [];
       snap.forEach(function (d) {
         var v = d.data() || {};
-        users.push({ id: d.id, email: v.email || "", mobile: v.mobile || "", displayName: v.displayName || "", banned: !!v.banned, role: v.role || "user", subscription: v.subscription || null });
+        users.push({ id: d.id, email: v.email || "", mobile: v.mobile || "", displayName: v.displayName || "", banned: !!v.banned, role: v.role || "user", leaderboardSuspended: v.leaderboardSuspended === true, subscription: v.subscription || null });
       });
       renderStats(); render();
     }).catch(function () {

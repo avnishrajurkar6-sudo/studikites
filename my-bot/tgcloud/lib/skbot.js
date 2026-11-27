@@ -3,23 +3,52 @@
    an administrator of that group so getChatMember can confirm membership. */
 import { api, fetch } from "sdk";
 
-export const GROUP_ID = "@studikitez";
-export const GROUP_INVITE = "https://t.me/studikitez";
-export const VERIFY_URL = "https://studikites.vercel.app/api/telegram/verify";
+export const GROUP_ID = "@studikitesz";
+export const GROUP_INVITE = "https://t.me/studikitesz";
+export const VERIFY_URL = "https://studikitesz.avnishrajurkar6.workers.dev/api/telegram/verify";
 /* Optional: set the same value as TELEGRAM_BOT_SECRET in Vercel. Leave empty to
    rely on the single-use token alone. */
 export const BOT_SECRET = "";
 
 const MEMBER_STATES = ["creator", "administrator", "member", "restricted"];
+/* Admins (group creator + administrators) count as members; they're even in. */
+const ADMIN_STATES = ["creator", "administrator"];
 
-export async function isMember(userId) {
+/* Look up the user's membership in the community group.
+   Returns { known, isMember, isAdmin, status }. `known` is false when the
+   Bot API couldn't tell us (e.g. bot isn't an admin, transient error). */
+export async function getMembership(userId) {
   try {
     const member = await api.getChatMember({ chat_id: GROUP_ID, user_id: userId });
-    return !!member && MEMBER_STATES.indexOf(member.status) >= 0 && member.is_member !== false;
+    const status = member && member.status ? member.status : null;
+    const known = !!member && !!status;
+    const present = known && member.is_member !== false;
+    return {
+      known,
+      isMember: present && MEMBER_STATES.indexOf(status) >= 0,
+      isAdmin: present && ADMIN_STATES.indexOf(status) >= 0,
+      status,
+    };
   } catch (error) {
     console.error("getChatMember failed", error && (error.description || error.message));
-    return null; /* unknown, not "not a member" */
+    return { known: false, isMember: false, isAdmin: false, status: null };
   }
+}
+
+/* True if the user is in the community group (members + admins pass);
+   false if not; null if membership couldn't be checked. */
+export async function isMember(userId) {
+  const m = await getMembership(userId);
+  if (!m.known) return null;
+  return m.isMember;
+}
+
+/* True if the user is an administrator/creator of the group; false if not;
+   null if membership couldn't be checked. */
+export async function isAdmin(userId) {
+  const m = await getMembership(userId);
+  if (!m.known) return null;
+  return m.isAdmin;
 }
 
 export function joinKeyboard(token) {

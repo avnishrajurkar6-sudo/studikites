@@ -325,9 +325,14 @@ window.SK.ui = (function () {
     if (widget) widget.remove();
   }
   var telegramPromptBusy = false;
+  var telegramNagTimer = null;
+  var TG_NAG_INTERVAL_MS = 30 * 60 * 1000; /* re-prompt every 30 minutes */
+  var TG_GROUP_URL = "https://t.me/studikitesz";
   function telegramNag() {
     var widget = document.getElementById("tg-widget");
     if (widget) widget.remove();
+    /* Re-prompt every 30 min for signed-in users who still haven't joined/verified Telegram. */
+    if (!telegramNagTimer) { telegramNagTimer = setInterval(function () { telegramNag(); }, TG_NAG_INTERVAL_MS); }
     if (telegramPromptBusy || isAuthPage()) return;
     telegramPromptBusy = true;
     (async function () {
@@ -335,8 +340,11 @@ window.SK.ui = (function () {
         var user = await window.SK.fb.currentUser();
         if (!user) return;
         var dismissedKey = "sk_tg_dismissed_" + user.uid;
-        if (store(dismissedKey) === "1" || sstore("sk_tg_linking_" + user.uid) === "1") return;
+        var lastDismissed = Number(store(dismissedKey) || 0);
+        /* "Not now" hides it for 30 minutes, not forever. */
+        if (lastDismissed && (Date.now() - lastDismissed) < TG_NAG_INTERVAL_MS) return;
         var profile = await window.SK.fb.userDoc(user.uid);
+        /* Only users who haven't joined/verified Telegram see this. */
         if (profile && profile.telegramVerified === true) return;
         if (modalHost) {
           setTimeout(function () { telegramPromptBusy = false; telegramNag(); }, 2500);
@@ -344,13 +352,14 @@ window.SK.ui = (function () {
         }
         var dialog = modal(
           '<span class="kicker">Account verification</span>' +
-          '<h3 style="margin:.5rem 0 .4rem">Verify your Telegram account</h3>' +
-          '<p class="muted" style="margin:0;font-size:.92rem;line-height:1.55">Open the StudiKitEZ bot from your account to verify Telegram. This links your Telegram profile to your signed-in account.</p>' +
+          '<h3 style="margin:.5rem 0 .4rem">Join the group &amp; verify Telegram</h3>' +
+          '<p class="muted" style="margin:0;font-size:.92rem;line-height:1.55">Join our community group <a href="' + TG_GROUP_URL + '" target="_blank" rel="noopener">t.me/studikitesz</a>, then verify your Telegram. This links your Telegram profile to your signed-in account. Members and admins of the group can verify. This reminder repeats every 30 minutes until you\'ve joined.</p>' +
           '<div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">' +
+          '<a class="btn btn-ghost btn-sm" id="tg-join" href="' + TG_GROUP_URL + '" target="_blank" rel="noopener">Join group</a>' +
           '<button class="btn btn-primary btn-sm" id="tg-verify">Verify with Telegram</button>' +
           '<button class="btn btn-ghost btn-sm" id="tg-later">Not now</button></div>');
         dialog.querySelector("#tg-later").addEventListener("click", function () {
-          store(dismissedKey, "1");
+          store(dismissedKey, String(Date.now()));
           closeModal();
         });
         dialog.querySelector("#tg-verify").addEventListener("click", async function (event) {

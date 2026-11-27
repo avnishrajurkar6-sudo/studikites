@@ -151,6 +151,22 @@ window.SK.api = (function () {
   function sendOtp(mobile, deviceId) { return req("POST", "/api/auth/send-otp", { body: { mobile: mobile, deviceId: deviceId } }); }
   function verifyOtp(mobile, otp, deviceId) { return req("POST", "/api/auth/verify-otp", { body: { mobile: mobile, otp: otp, deviceId: deviceId } }); }
   function isAdmin(headers) { return req("POST", "/api/auth/is-admin", { headers: headers, body: {}, timeout: 10000 }); }
+  async function updateLeaderboardProfile(data) {
+    var headers = window.SK.fb ? await window.SK.fb.authHeaders() : {};
+    return req("POST", "/api/auth/leaderboard", {
+      headers: headers,
+      body: Object.assign({}, data || {}, { action: "update" }),
+      timeout: 12000
+    });
+  }
+  async function suspendLeaderboardUser(uid, suspended) {
+    var headers = window.SK.fb ? await window.SK.fb.authHeaders() : {};
+    return req("POST", "/api/auth/leaderboard", {
+      headers: headers,
+      body: { action: "suspend", uid: uid, suspended: suspended === true },
+      timeout: 12000
+    });
+  }
   async function createTelegramLink(headers) {
     headers = headers || (window.SK.fb ? await window.SK.fb.authHeaders().catch(function () { return {}; }) : {});
     return req("POST", "/api/telegram/link", {
@@ -254,6 +270,7 @@ window.SK.api = (function () {
     request: req, getConfig: getConfig, catalog: catalog, allBatches: allBatches,
     content: content, play: play, live: live,
     sendOtp: sendOtp, verifyOtp: verifyOtp, isAdmin: isAdmin, createTelegramLink: createTelegramLink,
+    updateLeaderboardProfile: updateLeaderboardProfile, suspendLeaderboardUser: suspendLeaderboardUser,
     phoneProfile: phoneProfile, aiChat: aiChat, brand: brand, strike: strike,
     freePreviewId: freePreviewId, isFreePreview: isFreePreview,
     deviceId: deviceId, validMobile: validMobile, fmtDur: fmtDur, parseLinks: parseLinks
